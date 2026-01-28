@@ -1,20 +1,21 @@
 {
   "expo": {
-    "name": "fastshot-app",
-    "slug": "fastshot-app",
+    "name": "Orbit",
+    "slug": "orbit",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "fastshot",
-    "userInterfaceStyle": "automatic",
+    "scheme": "orbit",
+    "userInterfaceStyle": "dark",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": false
+      "supportsTablet": true,
+      "requireFullScreen": false
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
+        "backgroundColor": "#0A1622"
       },
       "edgeToEdgeEnabled": true
     },
@@ -31,12 +32,13 @@
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 200,
           "resizeMode": "contain",
-          "backgroundColor": "#ffffff"
+          "backgroundColor": "#0A1622"
         }
       ]
     ],
     "experiments": {
-      "typedRoutes": true
+      "typedRoutes": true,
+      "baseUrl": ""
     }
   }
 }
