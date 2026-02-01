@@ -1,3 +1,4 @@
+// Cloud9 Main Menu - Dedicated Triple-Marble Experience
 import React, { useEffect, useRef } from 'react';
 import {
   View,
@@ -7,20 +8,220 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import Svg, { Path, Circle, Defs, RadialGradient, Stop } from 'react-native-svg';
 import {
-  COLORS,
-  Button,
-  OrbitLogo,
   useProgress,
   useCalibrationData,
   useHaptics,
-  getTotalLevels,
 } from '../game';
+import { CLOUD9_COLORS, MARBLE_COLORS } from '../game/constants/cloud9';
+import { MULTI_MARBLE_LEVELS } from '../game/levels/multiMarbleLevels';
 
-export default function MainMenu() {
+// Cloud9 Logo Component
+function Cloud9LogoLarge({ size }: { size: number }) {
+  return (
+    <Svg width={size} height={size * 0.7} viewBox="0 0 200 140">
+      <Defs>
+        <RadialGradient id="logoGradient" cx="50%" cy="50%" r="50%">
+          <Stop offset="0%" stopColor={CLOUD9_COLORS.primaryLight} />
+          <Stop offset="100%" stopColor={CLOUD9_COLORS.primary} />
+        </RadialGradient>
+      </Defs>
+      {/* Cloud9-inspired logo path */}
+      <Path
+        d="M60 70 C60 40, 90 20, 100 50 C110 20, 140 40, 140 70 C160 70, 180 90, 160 110 C180 130, 140 140, 100 120 C60 140, 20 130, 40 110 C20 90, 40 70, 60 70 Z"
+        fill="url(#logoGradient)"
+      />
+      {/* Number 9 inside */}
+      <Circle cx="100" cy="75" r="20" fill={CLOUD9_COLORS.white} />
+      <Circle cx="100" cy="75" r="12" fill={CLOUD9_COLORS.primary} />
+      <Path
+        d="M100 85 L100 110"
+        stroke={CLOUD9_COLORS.white}
+        strokeWidth="8"
+        strokeLinecap="round"
+      />
+    </Svg>
+  );
+}
+
+// Three Marbles Display Component
+function ThreeMarblesDisplay({ size }: { size: number }) {
+  const pulseAnim1 = useRef(new Animated.Value(1)).current;
+  const pulseAnim2 = useRef(new Animated.Value(1)).current;
+  const pulseAnim3 = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    const createPulse = (anim: Animated.Value, delay: number) => {
+      return Animated.loop(
+        Animated.sequence([
+          Animated.delay(delay),
+          Animated.timing(anim, {
+            toValue: 1.15,
+            duration: 800,
+            useNativeDriver: true,
+          }),
+          Animated.timing(anim, {
+            toValue: 1,
+            duration: 800,
+            useNativeDriver: true,
+          }),
+        ])
+      );
+    };
+
+    Animated.parallel([
+      createPulse(pulseAnim1, 0),
+      createPulse(pulseAnim2, 200),
+      createPulse(pulseAnim3, 400),
+    ]).start();
+  }, []);
+
+  const marbleSize = size * 0.28;
+
+  return (
+    <View style={[styles.marblesContainer, { width: size, height: size * 0.5 }]}>
+      <Animated.View
+        style={[
+          styles.marbleWrapper,
+          { transform: [{ scale: pulseAnim1 }] },
+        ]}
+      >
+        <View
+          style={[
+            styles.marble,
+            {
+              width: marbleSize,
+              height: marbleSize,
+              borderRadius: marbleSize / 2,
+              backgroundColor: MARBLE_COLORS.red.main,
+              shadowColor: MARBLE_COLORS.red.glow,
+            },
+          ]}
+        >
+          <View style={[styles.marbleHighlight, { width: marbleSize * 0.3, height: marbleSize * 0.3 }]} />
+        </View>
+      </Animated.View>
+
+      <Animated.View
+        style={[
+          styles.marbleWrapper,
+          { transform: [{ scale: pulseAnim2 }], marginTop: -15 },
+        ]}
+      >
+        <View
+          style={[
+            styles.marble,
+            {
+              width: marbleSize,
+              height: marbleSize,
+              borderRadius: marbleSize / 2,
+              backgroundColor: MARBLE_COLORS.blue.main,
+              shadowColor: MARBLE_COLORS.blue.glow,
+            },
+          ]}
+        >
+          <View style={[styles.marbleHighlight, { width: marbleSize * 0.3, height: marbleSize * 0.3 }]} />
+        </View>
+      </Animated.View>
+
+      <Animated.View
+        style={[
+          styles.marbleWrapper,
+          { transform: [{ scale: pulseAnim3 }] },
+        ]}
+      >
+        <View
+          style={[
+            styles.marble,
+            {
+              width: marbleSize,
+              height: marbleSize,
+              borderRadius: marbleSize / 2,
+              backgroundColor: MARBLE_COLORS.green.main,
+              shadowColor: MARBLE_COLORS.green.glow,
+            },
+          ]}
+        >
+          <View style={[styles.marbleHighlight, { width: marbleSize * 0.3, height: marbleSize * 0.3 }]} />
+        </View>
+      </Animated.View>
+    </View>
+  );
+}
+
+// Menu Button Component
+interface MenuButtonProps {
+  title: string;
+  subtitle?: string;
+  icon: React.ReactNode;
+  onPress: () => void;
+  variant?: 'primary' | 'secondary' | 'ghost';
+}
+
+function MenuButton({ title, subtitle, icon, onPress, variant = 'primary' }: MenuButtonProps) {
+  const scaleAnim = useRef(new Animated.Value(1)).current;
+
+  const handlePressIn = () => {
+    Animated.spring(scaleAnim, {
+      toValue: 0.97,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const handlePressOut = () => {
+    Animated.spring(scaleAnim, {
+      toValue: 1,
+      friction: 5,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const isPrimary = variant === 'primary';
+  const isSecondary = variant === 'secondary';
+
+  return (
+    <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
+      <View
+        style={[
+          styles.menuButton,
+          isPrimary && styles.menuButtonPrimary,
+          isSecondary && styles.menuButtonSecondary,
+          variant === 'ghost' && styles.menuButtonGhost,
+        ]}
+        onTouchStart={handlePressIn}
+        onTouchEnd={() => {
+          handlePressOut();
+          onPress();
+        }}
+      >
+        <View style={styles.menuButtonIcon}>{icon}</View>
+        <View style={styles.menuButtonText}>
+          <Text
+            style={[
+              styles.menuButtonTitle,
+              isPrimary && styles.menuButtonTitlePrimary,
+            ]}
+          >
+            {title}
+          </Text>
+          {subtitle && (
+            <Text style={styles.menuButtonSubtitle}>{subtitle}</Text>
+          )}
+        </View>
+        <Ionicons
+          name="chevron-forward"
+          size={24}
+          color={isPrimary ? CLOUD9_COLORS.white : CLOUD9_COLORS.primary}
+        />
+      </View>
+    </Animated.View>
+  );
+}
+
+export default function Cloud9MainMenu() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
@@ -29,46 +230,44 @@ export default function MainMenu() {
   const haptics = useHaptics({ enabled: true });
 
   // Animation values
-  const logoScale = useRef(new Animated.Value(0.8)).current;
   const logoOpacity = useRef(new Animated.Value(0)).current;
-  const buttonsTranslateY = useRef(new Animated.Value(50)).current;
-  const buttonsOpacity = useRef(new Animated.Value(0)).current;
+  const logoScale = useRef(new Animated.Value(0.8)).current;
+  const contentOpacity = useRef(new Animated.Value(0)).current;
+  const contentTranslateY = useRef(new Animated.Value(30)).current;
 
   useEffect(() => {
     // Entrance animations
-    Animated.parallel([
-      Animated.spring(logoScale, {
-        toValue: 1,
-        friction: 8,
-        tension: 40,
-        useNativeDriver: true,
-      }),
-      Animated.timing(logoOpacity, {
-        toValue: 1,
-        duration: 600,
-        useNativeDriver: true,
-      }),
-    ]).start();
-
     Animated.sequence([
-      Animated.delay(300),
       Animated.parallel([
-        Animated.spring(buttonsTranslateY, {
-          toValue: 0,
+        Animated.timing(logoOpacity, {
+          toValue: 1,
+          duration: 600,
+          useNativeDriver: true,
+        }),
+        Animated.spring(logoScale, {
+          toValue: 1,
           friction: 8,
           tension: 40,
           useNativeDriver: true,
         }),
-        Animated.timing(buttonsOpacity, {
+      ]),
+      Animated.parallel([
+        Animated.timing(contentOpacity, {
           toValue: 1,
           duration: 400,
+          useNativeDriver: true,
+        }),
+        Animated.spring(contentTranslateY, {
+          toValue: 0,
+          friction: 8,
+          tension: 40,
           useNativeDriver: true,
         }),
       ]),
     ]).start();
   }, []);
 
-  const handlePlay = () => {
+  const handleBeginOrbit = () => {
     haptics.button();
     if (!calibration.isCalibrated) {
       router.push('/calibration');
@@ -77,32 +276,24 @@ export default function MainMenu() {
     }
   };
 
+  const handleCalibration = () => {
+    haptics.button();
+    router.push('/calibration');
+  };
+
   const handleSettings = () => {
     haptics.button();
     router.push('/settings');
   };
 
-  const handleCloud9Mode = () => {
-    haptics.button();
-    if (!calibration.isCalibrated) {
-      router.push('/calibration');
-    } else {
-      router.push('/cloud9-levels');
-    }
-  };
-
-  const totalLevels = getTotalLevels();
+  // Calculate progress
   const completedLevels = Object.values(progress.levels).filter(
     (l) => l.completed
   ).length;
+  const totalLevels = MULTI_MARBLE_LEVELS.length;
 
   return (
-    <LinearGradient
-      colors={[COLORS.bgDark, COLORS.bgMid, COLORS.bgLight]}
-      style={styles.container}
-      start={{ x: 0.5, y: 0 }}
-      end={{ x: 0.5, y: 1 }}
-    >
+    <View style={styles.container}>
       {/* Decorative background circles */}
       <View style={styles.bgDecoration}>
         <View style={[styles.bgCircle, styles.bgCircle1]} />
@@ -110,38 +301,41 @@ export default function MainMenu() {
         <View style={[styles.bgCircle, styles.bgCircle3]} />
       </View>
 
-      <View style={[styles.content, { paddingTop: insets.top + 40 }]}>
-        {/* Logo and Title */}
+      <View style={[styles.content, { paddingTop: insets.top + 20 }]}>
+        {/* Logo Section */}
         <Animated.View
           style={[
-            styles.header,
+            styles.logoSection,
             {
               opacity: logoOpacity,
               transform: [{ scale: logoScale }],
             },
           ]}
         >
-          <OrbitLogo size={Math.min(width * 0.5, 200)} />
-          <Text style={styles.title}>ORBIT</Text>
-          <Text style={styles.subtitle}>Tilt • Roll • Conquer</Text>
+          <Cloud9LogoLarge size={Math.min(width * 0.6, 220)} />
+          <Text style={styles.title}>CLOUD9</Text>
+          <Text style={styles.subtitle}>TRIPLE MARBLE CHALLENGE</Text>
+          <ThreeMarblesDisplay size={Math.min(width * 0.5, 180)} />
         </Animated.View>
 
-        {/* Progress indicator */}
+        {/* Progress Badge */}
         {completedLevels > 0 && (
           <Animated.View
             style={[
-              styles.progressContainer,
-              { opacity: buttonsOpacity },
+              styles.progressBadge,
+              {
+                opacity: contentOpacity,
+                transform: [{ translateY: contentTranslateY }],
+              },
             ]}
           >
-            <View style={styles.progressBadge}>
-              <Ionicons name="star" size={16} color={COLORS.gold} />
-              <Text style={styles.progressText}>
-                {progress.totalStars} Stars
-              </Text>
+            <View style={styles.progressItem}>
+              <Ionicons name="star" size={16} color={CLOUD9_COLORS.warning} />
+              <Text style={styles.progressText}>{progress.totalStars} Stars</Text>
             </View>
-            <View style={styles.progressBadge}>
-              <Ionicons name="checkmark-circle" size={16} color={COLORS.success} />
+            <View style={styles.progressDivider} />
+            <View style={styles.progressItem}>
+              <Ionicons name="checkmark-circle" size={16} color={CLOUD9_COLORS.success} />
               <Text style={styles.progressText}>
                 {completedLevels}/{totalLevels} Levels
               </Text>
@@ -152,45 +346,52 @@ export default function MainMenu() {
         {/* Menu Buttons */}
         <Animated.View
           style={[
-            styles.buttons,
+            styles.menuContainer,
             {
-              opacity: buttonsOpacity,
-              transform: [{ translateY: buttonsTranslateY }],
+              opacity: contentOpacity,
+              transform: [{ translateY: contentTranslateY }],
             },
           ]}
         >
-          <Button
-            title="Play"
-            onPress={handlePlay}
-            size="large"
-            icon={<Ionicons name="play" size={24} color={COLORS.white} />}
+          <MenuButton
+            title="Begin Orbit"
+            subtitle="Start your triple-marble journey"
+            icon={<Ionicons name="play-circle" size={28} color={CLOUD9_COLORS.white} />}
+            onPress={handleBeginOrbit}
+            variant="primary"
           />
 
-          <Button
-            title="Cloud9 Mode"
-            onPress={handleCloud9Mode}
+          <MenuButton
+            title="Calibration"
+            subtitle={calibration.isCalibrated ? 'Device calibrated' : 'Set your neutral position'}
+            icon={<Ionicons name="compass" size={24} color={CLOUD9_COLORS.primary} />}
+            onPress={handleCalibration}
             variant="secondary"
-            size="medium"
-            icon={<Ionicons name="cloudy" size={20} color={COLORS.skyBlue} />}
           />
 
-          <Button
+          <MenuButton
             title="Settings"
+            subtitle="Controls, audio & more"
+            icon={<Ionicons name="settings-outline" size={24} color={CLOUD9_COLORS.textSecondary} />}
             onPress={handleSettings}
             variant="ghost"
-            size="small"
-            icon={<Ionicons name="settings-outline" size={18} color={COLORS.textSecondary} />}
           />
         </Animated.View>
 
-        {/* Calibration notice */}
+        {/* Calibration Notice */}
         {!calibration.isCalibrated && (
           <Animated.View
-            style={[styles.notice, { opacity: buttonsOpacity }]}
+            style={[
+              styles.notice,
+              {
+                opacity: contentOpacity,
+                transform: [{ translateY: contentTranslateY }],
+              },
+            ]}
           >
-            <Ionicons name="information-circle" size={16} color={COLORS.skyBlue} />
+            <Ionicons name="information-circle" size={18} color={CLOUD9_COLORS.primary} />
             <Text style={styles.noticeText}>
-              Calibration required for best experience
+              Calibration required for the best experience
             </Text>
           </Animated.View>
         )}
@@ -198,15 +399,16 @@ export default function MainMenu() {
 
       {/* Version */}
       <Text style={[styles.version, { bottom: insets.bottom + 16 }]}>
-        v1.0.0
+        Cloud9 v2.0
       </Text>
-    </LinearGradient>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: CLOUD9_COLORS.background,
   },
   bgDecoration: {
     ...StyleSheet.absoluteFillObject,
@@ -215,102 +417,177 @@ const styles = StyleSheet.create({
   bgCircle: {
     position: 'absolute',
     borderRadius: 1000,
-    borderWidth: 1,
-    borderColor: COLORS.skyBlueTranslucent,
+    borderWidth: 2,
+    borderColor: CLOUD9_COLORS.primaryTranslucent,
   },
   bgCircle1: {
-    width: 400,
-    height: 400,
-    top: -100,
-    right: -150,
+    width: 500,
+    height: 500,
+    top: -200,
+    right: -200,
     opacity: 0.3,
   },
   bgCircle2: {
-    width: 300,
-    height: 300,
-    bottom: 100,
-    left: -100,
+    width: 400,
+    height: 400,
+    bottom: 50,
+    left: -150,
     opacity: 0.2,
   },
   bgCircle3: {
-    width: 200,
-    height: 200,
-    bottom: -50,
-    right: 50,
+    width: 300,
+    height: 300,
+    bottom: -100,
+    right: 20,
     opacity: 0.15,
   },
   content: {
     flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 32,
+    paddingHorizontal: 24,
   },
-  header: {
+  logoSection: {
     alignItems: 'center',
-    marginBottom: 40,
+    paddingTop: 20,
+    paddingBottom: 16,
   },
   title: {
-    fontSize: 56,
+    fontSize: 48,
     fontWeight: '800',
-    color: COLORS.white,
-    letterSpacing: 12,
-    marginTop: 24,
-    textShadowColor: COLORS.skyBlue,
-    textShadowOffset: { width: 0, height: 0 },
-    textShadowRadius: 20,
+    color: CLOUD9_COLORS.primary,
+    letterSpacing: 8,
+    marginTop: 16,
   },
   subtitle: {
-    fontSize: 16,
-    color: COLORS.textSecondary,
-    letterSpacing: 4,
-    marginTop: 8,
-    textTransform: 'uppercase',
+    fontSize: 12,
+    fontWeight: '600',
+    color: CLOUD9_COLORS.textSecondary,
+    letterSpacing: 3,
+    marginTop: 4,
   },
-  progressContainer: {
+  marblesContainer: {
     flexDirection: 'row',
-    gap: 16,
-    marginBottom: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 20,
+    gap: 12,
+  },
+  marbleWrapper: {
+    alignItems: 'center',
+  },
+  marble: {
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.8,
+    shadowRadius: 12,
+    elevation: 8,
+    justifyContent: 'flex-start',
+    alignItems: 'flex-end',
+    paddingTop: 4,
+    paddingRight: 6,
+  },
+  marbleHighlight: {
+    backgroundColor: 'rgba(255, 255, 255, 0.6)',
+    borderRadius: 100,
   },
   progressBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    backgroundColor: COLORS.overlayDark,
-    paddingVertical: 8,
-    paddingHorizontal: 14,
-    borderRadius: 20,
+    justifyContent: 'center',
+    backgroundColor: CLOUD9_COLORS.backgroundSecondary,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 30,
+    marginBottom: 24,
     borderWidth: 1,
-    borderColor: COLORS.skyBlueTranslucent,
+    borderColor: CLOUD9_COLORS.primaryTranslucent,
+    alignSelf: 'center',
+  },
+  progressItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  progressDivider: {
+    width: 1,
+    height: 16,
+    backgroundColor: CLOUD9_COLORS.grayLight,
+    marginHorizontal: 16,
   },
   progressText: {
-    color: COLORS.textSecondary,
     fontSize: 14,
-    fontWeight: '500',
+    fontWeight: '600',
+    color: CLOUD9_COLORS.textPrimary,
   },
-  buttons: {
-    gap: 16,
-    width: '100%',
-    maxWidth: 280,
+  menuContainer: {
+    gap: 12,
+  },
+  menuButton: {
+    flexDirection: 'row',
     alignItems: 'center',
+    padding: 16,
+    borderRadius: 16,
+    gap: 16,
+  },
+  menuButtonPrimary: {
+    backgroundColor: CLOUD9_COLORS.primary,
+    shadowColor: CLOUD9_COLORS.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  menuButtonSecondary: {
+    backgroundColor: CLOUD9_COLORS.backgroundSecondary,
+    borderWidth: 2,
+    borderColor: CLOUD9_COLORS.primary,
+  },
+  menuButtonGhost: {
+    backgroundColor: CLOUD9_COLORS.overlayLight,
+  },
+  menuButtonIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  menuButtonText: {
+    flex: 1,
+  },
+  menuButtonTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: CLOUD9_COLORS.textPrimary,
+  },
+  menuButtonTitlePrimary: {
+    color: CLOUD9_COLORS.white,
+  },
+  menuButtonSubtitle: {
+    fontSize: 13,
+    color: CLOUD9_COLORS.textSecondary,
+    marginTop: 2,
   },
   notice: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    marginTop: 32,
-    paddingVertical: 10,
+    marginTop: 24,
+    paddingVertical: 12,
     paddingHorizontal: 16,
-    backgroundColor: COLORS.overlayLight,
-    borderRadius: 20,
+    backgroundColor: CLOUD9_COLORS.backgroundSecondary,
+    borderRadius: 12,
+    borderLeftWidth: 3,
+    borderLeftColor: CLOUD9_COLORS.primary,
   },
   noticeText: {
-    color: COLORS.textSecondary,
     fontSize: 13,
+    color: CLOUD9_COLORS.textSecondary,
+    flex: 1,
   },
   version: {
     position: 'absolute',
     alignSelf: 'center',
-    color: COLORS.textMuted,
     fontSize: 12,
+    color: CLOUD9_COLORS.textMuted,
   },
 });

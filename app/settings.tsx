@@ -1,3 +1,4 @@
+// Cloud9 Settings - Refined Triple-Marble Controls
 import React from 'react';
 import {
   View,
@@ -8,12 +9,10 @@ import {
   Alert,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import Slider from '@react-native-community/slider';
 import {
-  COLORS,
   Button,
   IconButton,
   GAME_CONFIG,
@@ -22,6 +21,7 @@ import {
   useProgress,
   useHaptics,
 } from '../game';
+import { CLOUD9_COLORS, MARBLE_COLORS } from '../game/constants/cloud9';
 
 interface SettingSectionProps {
   title: string;
@@ -59,7 +59,26 @@ function SettingRow({ icon, label, description, children }: SettingRowProps) {
   );
 }
 
-export default function SettingsScreen() {
+// Sensitivity level indicator
+function SensitivityIndicator({ level }: { level: number }) {
+  const getSensitivityLabel = () => {
+    if (level < 0.7) return { label: 'Low', color: CLOUD9_COLORS.success };
+    if (level < 1.0) return { label: 'Medium', color: CLOUD9_COLORS.warning };
+    if (level < 1.3) return { label: 'High', color: CLOUD9_COLORS.error };
+    return { label: 'Very High', color: CLOUD9_COLORS.error };
+  };
+
+  const { label, color } = getSensitivityLabel();
+
+  return (
+    <View style={styles.sensitivityIndicator}>
+      <View style={[styles.sensitivityDot, { backgroundColor: color }]} />
+      <Text style={[styles.sensitivityLabel, { color }]}>{label}</Text>
+    </View>
+  );
+}
+
+export default function Cloud9SettingsScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { settings, updateSettings } = useSettings();
@@ -80,7 +99,7 @@ export default function SettingsScreen() {
   const handleResetProgress = () => {
     Alert.alert(
       'Reset Progress',
-      'Are you sure you want to reset all game progress? This cannot be undone.',
+      'Are you sure you want to reset all Cloud9 game progress? This includes completed levels, stars, and best times.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -89,7 +108,7 @@ export default function SettingsScreen() {
           onPress: async () => {
             haptics.pitFall();
             await resetProgress();
-            Alert.alert('Progress Reset', 'Your game progress has been reset.');
+            Alert.alert('Progress Reset', 'Your Cloud9 progress has been reset.');
           },
         },
       ]
@@ -109,17 +128,24 @@ export default function SettingsScreen() {
   };
 
   return (
-    <LinearGradient
-      colors={[COLORS.bgDark, COLORS.bgMid]}
-      style={styles.container}
-    >
+    <View style={styles.container}>
+      {/* Background decoration */}
+      <View style={styles.bgDecoration}>
+        <View style={[styles.bgCircle, styles.bgCircle1]} />
+        <View style={[styles.bgCircle, styles.bgCircle2]} />
+      </View>
+
       {/* Header */}
       <View style={[styles.header, { paddingTop: insets.top + 16 }]}>
         <IconButton
           onPress={handleBack}
-          icon={<Ionicons name="arrow-back" size={24} color={COLORS.white} />}
+          icon={<Ionicons name="arrow-back" size={24} color={CLOUD9_COLORS.textPrimary} />}
+          style={styles.backButton}
         />
-        <Text style={styles.title}>Settings</Text>
+        <View style={styles.headerTitle}>
+          <Text style={styles.title}>Settings</Text>
+          <Text style={styles.subtitle}>Triple Marble Control</Text>
+        </View>
         <View style={{ width: 44 }} />
       </View>
 
@@ -131,39 +157,59 @@ export default function SettingsScreen() {
         ]}
         showsVerticalScrollIndicator={false}
       >
-        {/* Controls Section */}
-        <SettingSection title="Controls">
-          <SettingRow
-            icon={
-              <Ionicons
-                name="phone-portrait-outline"
-                size={22}
-                color={COLORS.skyBlue}
-              />
-            }
-            label="Tilt Sensitivity"
-            description={`${(settings.tiltSensitivity * 100).toFixed(0)}%`}
-          >
-            <View style={styles.sliderContainer}>
+        {/* Sensitivity Section - Enhanced for triple marble */}
+        <SettingSection title="Tilt Sensitivity">
+          <View style={styles.sensitivityCard}>
+            <View style={styles.sensitivityHeader}>
+              <View style={styles.sensitivityTitle}>
+                <Ionicons name="speedometer" size={22} color={CLOUD9_COLORS.primary} />
+                <Text style={styles.sensitivityTitleText}>Control Precision</Text>
+              </View>
+              <SensitivityIndicator level={settings.tiltSensitivity} />
+            </View>
+
+            <Text style={styles.sensitivityHint}>
+              Lower sensitivity recommended for managing three marbles
+            </Text>
+
+            <View style={styles.sliderRow}>
+              <Text style={styles.sliderLabel}>Gentle</Text>
               <Slider
                 style={styles.slider}
                 minimumValue={GAME_CONFIG.minSensitivity}
                 maximumValue={GAME_CONFIG.maxSensitivity}
                 value={settings.tiltSensitivity}
                 onSlidingComplete={updateSensitivity}
-                minimumTrackTintColor={COLORS.skyBlue}
-                maximumTrackTintColor={COLORS.charcoal}
-                thumbTintColor={COLORS.skyBlue}
+                minimumTrackTintColor={CLOUD9_COLORS.primary}
+                maximumTrackTintColor={CLOUD9_COLORS.grayLight}
+                thumbTintColor={CLOUD9_COLORS.primary}
               />
+              <Text style={styles.sliderLabel}>Fast</Text>
             </View>
-          </SettingRow>
 
+            <View style={styles.sensitivityValue}>
+              <Text style={styles.sensitivityValueText}>
+                {(settings.tiltSensitivity * 100).toFixed(0)}%
+              </Text>
+            </View>
+
+            {/* Visual sensitivity preview */}
+            <View style={styles.sensitivityPreview}>
+              <View style={[styles.previewMarble, { backgroundColor: MARBLE_COLORS.red.main }]} />
+              <View style={[styles.previewMarble, { backgroundColor: MARBLE_COLORS.blue.main }]} />
+              <View style={[styles.previewMarble, { backgroundColor: MARBLE_COLORS.green.main }]} />
+            </View>
+          </View>
+        </SettingSection>
+
+        {/* Controls Section */}
+        <SettingSection title="Controls">
           <SettingRow
             icon={
               <Ionicons
                 name="game-controller-outline"
                 size={22}
-                color={COLORS.skyBlue}
+                color={CLOUD9_COLORS.primary}
               />
             }
             label="Virtual Joystick"
@@ -174,37 +220,45 @@ export default function SettingsScreen() {
               onValueChange={(value) =>
                 toggleSetting('virtualJoystickEnabled', value)
               }
-              trackColor={{ false: COLORS.charcoal, true: COLORS.skyBlue }}
-              thumbColor={COLORS.white}
+              trackColor={{ false: CLOUD9_COLORS.grayLight, true: CLOUD9_COLORS.primary }}
+              thumbColor={CLOUD9_COLORS.white}
             />
           </SettingRow>
         </SettingSection>
 
         {/* Calibration Section */}
         <SettingSection title="Calibration">
-          <View style={styles.calibrationStatus}>
-            <View style={styles.calibrationInfo}>
-              <View
-                style={[
-                  styles.calibrationIndicator,
-                  {
-                    backgroundColor: calibration.isCalibrated
-                      ? COLORS.success
-                      : COLORS.warning,
-                  },
-                ]}
-              />
-              <Text style={styles.calibrationText}>
-                {calibration.isCalibrated
-                  ? 'Calibrated'
-                  : 'Not calibrated'}
-              </Text>
+          <View style={styles.calibrationCard}>
+            <View style={styles.calibrationStatus}>
+              <View style={styles.calibrationInfo}>
+                <View
+                  style={[
+                    styles.calibrationIndicator,
+                    {
+                      backgroundColor: calibration.isCalibrated
+                        ? CLOUD9_COLORS.success
+                        : CLOUD9_COLORS.warning,
+                    },
+                  ]}
+                />
+                <View>
+                  <Text style={styles.calibrationText}>
+                    {calibration.isCalibrated ? 'Device Calibrated' : 'Not Calibrated'}
+                  </Text>
+                  <Text style={styles.calibrationSubtext}>
+                    {calibration.isCalibrated
+                      ? 'Your neutral position is set'
+                      : 'Calibration improves control precision'}
+                  </Text>
+                </View>
+              </View>
             </View>
             <Button
-              title="Recalibrate"
+              title={calibration.isCalibrated ? 'Recalibrate' : 'Calibrate Now'}
               onPress={handleRecalibrate}
-              variant="secondary"
-              size="small"
+              variant={calibration.isCalibrated ? 'secondary' : 'primary'}
+              size="medium"
+              icon={<Ionicons name="locate" size={18} color={calibration.isCalibrated ? CLOUD9_COLORS.primary : CLOUD9_COLORS.white} />}
             />
           </View>
         </SettingSection>
@@ -216,35 +270,36 @@ export default function SettingsScreen() {
               <Ionicons
                 name="volume-high-outline"
                 size={22}
-                color={COLORS.skyBlue}
+                color={CLOUD9_COLORS.primary}
               />
             }
             label="Sound Effects"
+            description="Collision and goal sounds"
           >
             <Switch
               value={settings.soundEnabled}
               onValueChange={(value) => toggleSetting('soundEnabled', value)}
-              trackColor={{ false: COLORS.charcoal, true: COLORS.skyBlue }}
-              thumbColor={COLORS.white}
+              trackColor={{ false: CLOUD9_COLORS.grayLight, true: CLOUD9_COLORS.primary }}
+              thumbColor={CLOUD9_COLORS.white}
             />
           </SettingRow>
 
           <SettingRow
             icon={
               <Ionicons
-                name="phone-portrait-outline"
+                name="hand-left-outline"
                 size={22}
-                color={COLORS.skyBlue}
+                color={CLOUD9_COLORS.primary}
               />
             }
             label="Haptic Feedback"
-            description="Vibration on events"
+            description="Wall hits & marble collisions"
           >
             <Switch
               value={settings.hapticsEnabled}
               onValueChange={(value) => toggleSetting('hapticsEnabled', value)}
-              trackColor={{ false: COLORS.charcoal, true: COLORS.skyBlue }}
-              thumbColor={COLORS.white}
+              trackColor={{ false: CLOUD9_COLORS.grayLight, true: CLOUD9_COLORS.primary }}
+              thumbColor={CLOUD9_COLORS.white}
             />
           </SettingRow>
         </SettingSection>
@@ -252,10 +307,12 @@ export default function SettingsScreen() {
         {/* Data Section */}
         <SettingSection title="Data">
           <View style={styles.dangerZone}>
-            <Text style={styles.dangerText}>
-              Reset all game progress including completed levels and star
-              ratings.
-            </Text>
+            <View style={styles.dangerInfo}>
+              <Ionicons name="warning-outline" size={20} color={CLOUD9_COLORS.error} />
+              <Text style={styles.dangerText}>
+                Reset all Cloud9 progress including completed levels, stars, and best times.
+              </Text>
+            </View>
             <Button
               title="Reset Progress"
               onPress={handleResetProgress}
@@ -270,22 +327,52 @@ export default function SettingsScreen() {
         {/* About Section */}
         <SettingSection title="About">
           <View style={styles.aboutContent}>
-            <Text style={styles.aboutTitle}>ORBIT</Text>
-            <Text style={styles.aboutVersion}>Version 1.0.0</Text>
+            <View style={styles.aboutLogo}>
+              <View style={[styles.aboutMarble, { backgroundColor: MARBLE_COLORS.red.main }]} />
+              <View style={[styles.aboutMarble, { backgroundColor: MARBLE_COLORS.blue.main }]} />
+              <View style={[styles.aboutMarble, { backgroundColor: MARBLE_COLORS.green.main }]} />
+            </View>
+            <Text style={styles.aboutTitle}>CLOUD9</Text>
+            <Text style={styles.aboutVersion}>Version 2.0.0</Text>
             <Text style={styles.aboutDescription}>
-              A high-end, professional tilt-based marble maze game with
-              physics-based gameplay and beautiful circular maze designs.
+              A premium triple-marble challenge game. Guide Red, Blue, and Green
+              marbles to their matching goals using precise tilt controls.
             </Text>
           </View>
         </SettingSection>
       </ScrollView>
-    </LinearGradient>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: CLOUD9_COLORS.background,
+  },
+  bgDecoration: {
+    ...StyleSheet.absoluteFillObject,
+    overflow: 'hidden',
+  },
+  bgCircle: {
+    position: 'absolute',
+    borderRadius: 1000,
+    borderWidth: 2,
+    borderColor: CLOUD9_COLORS.primaryTranslucent,
+  },
+  bgCircle1: {
+    width: 350,
+    height: 350,
+    top: -100,
+    right: -100,
+    opacity: 0.15,
+  },
+  bgCircle2: {
+    width: 250,
+    height: 250,
+    bottom: 100,
+    left: -80,
+    opacity: 0.1,
   },
   header: {
     flexDirection: 'row',
@@ -294,10 +381,23 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingBottom: 16,
   },
+  backButton: {
+    backgroundColor: CLOUD9_COLORS.backgroundSecondary,
+    borderWidth: 1,
+    borderColor: CLOUD9_COLORS.primaryTranslucent,
+  },
+  headerTitle: {
+    alignItems: 'center',
+  },
   title: {
     fontSize: 24,
     fontWeight: '700',
-    color: COLORS.white,
+    color: CLOUD9_COLORS.textPrimary,
+  },
+  subtitle: {
+    fontSize: 12,
+    color: CLOUD9_COLORS.textSecondary,
+    marginTop: 2,
   },
   scrollView: {
     flex: 1,
@@ -310,18 +410,18 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   sectionTitle: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
-    color: COLORS.skyBlue,
+    color: CLOUD9_COLORS.primary,
     textTransform: 'uppercase',
     letterSpacing: 1,
     marginLeft: 4,
   },
   sectionContent: {
-    backgroundColor: COLORS.overlayDark,
+    backgroundColor: CLOUD9_COLORS.backgroundSecondary,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: COLORS.skyBlueTranslucent,
+    borderColor: CLOUD9_COLORS.primaryTranslucent,
     overflow: 'hidden',
   },
   settingRow: {
@@ -329,13 +429,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: COLORS.charcoal,
+    borderBottomColor: CLOUD9_COLORS.grayLight,
   },
   settingIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
-    backgroundColor: COLORS.charcoal,
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: CLOUD9_COLORS.overlayLight,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 12,
@@ -346,77 +446,180 @@ const styles = StyleSheet.create({
   settingLabel: {
     fontSize: 16,
     fontWeight: '500',
-    color: COLORS.white,
+    color: CLOUD9_COLORS.textPrimary,
   },
   settingDescription: {
     fontSize: 13,
-    color: COLORS.textSecondary,
+    color: CLOUD9_COLORS.textSecondary,
     marginTop: 2,
   },
   settingControl: {
     marginLeft: 12,
   },
-  sliderContainer: {
-    width: 120,
+  sensitivityCard: {
+    padding: 20,
+  },
+  sensitivityHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  sensitivityTitle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  sensitivityTitleText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: CLOUD9_COLORS.textPrimary,
+  },
+  sensitivityIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 4,
+    paddingHorizontal: 10,
+    backgroundColor: CLOUD9_COLORS.overlayLight,
+    borderRadius: 12,
+  },
+  sensitivityDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  sensitivityLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  sensitivityHint: {
+    fontSize: 13,
+    color: CLOUD9_COLORS.textSecondary,
+    marginBottom: 16,
+  },
+  sliderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  sliderLabel: {
+    fontSize: 12,
+    color: CLOUD9_COLORS.textMuted,
+    width: 40,
   },
   slider: {
-    width: '100%',
+    flex: 1,
     height: 40,
+  },
+  sensitivityValue: {
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  sensitivityValueText: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: CLOUD9_COLORS.primary,
+  },
+  sensitivityPreview: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 8,
+    marginTop: 16,
+  },
+  previewMarble: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 3,
+    elevation: 3,
+  },
+  calibrationCard: {
+    padding: 16,
+    gap: 16,
   },
   calibrationStatus: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: 16,
   },
   calibrationInfo: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: 12,
   },
   calibrationIndicator: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
+    width: 12,
+    height: 12,
+    borderRadius: 6,
   },
   calibrationText: {
     fontSize: 15,
-    color: COLORS.textSecondary,
+    fontWeight: '600',
+    color: CLOUD9_COLORS.textPrimary,
+  },
+  calibrationSubtext: {
+    fontSize: 12,
+    color: CLOUD9_COLORS.textSecondary,
+    marginTop: 2,
   },
   dangerZone: {
     padding: 16,
+    gap: 16,
+  },
+  dangerInfo: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
   },
   dangerText: {
+    flex: 1,
     fontSize: 14,
-    color: COLORS.textSecondary,
-    marginBottom: 16,
+    color: CLOUD9_COLORS.textSecondary,
     lineHeight: 20,
   },
   dangerButton: {
-    borderColor: COLORS.error,
+    borderColor: CLOUD9_COLORS.error,
+    alignSelf: 'flex-start',
   },
   dangerButtonText: {
-    color: COLORS.error,
+    color: CLOUD9_COLORS.error,
   },
   aboutContent: {
-    padding: 20,
+    padding: 24,
     alignItems: 'center',
   },
+  aboutLogo: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 16,
+  },
+  aboutMarble: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 3,
+  },
   aboutTitle: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: COLORS.white,
+    fontSize: 28,
+    fontWeight: '800',
+    color: CLOUD9_COLORS.primary,
     letterSpacing: 4,
   },
   aboutVersion: {
     fontSize: 14,
-    color: COLORS.textSecondary,
+    color: CLOUD9_COLORS.textSecondary,
     marginTop: 4,
     marginBottom: 16,
   },
   aboutDescription: {
     fontSize: 14,
-    color: COLORS.textMuted,
+    color: CLOUD9_COLORS.textMuted,
     textAlign: 'center',
     lineHeight: 20,
   },

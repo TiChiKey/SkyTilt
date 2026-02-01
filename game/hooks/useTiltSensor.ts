@@ -88,10 +88,48 @@ export function useTiltSensor({
 }
 
 // Hook for calibration - captures current orientation as neutral
+// Also exposes raw tilt data for visualization
 export function useCalibration() {
   const [measurements, setMeasurements] = useState<AccelerometerMeasurement[]>([]);
   const [isCalibrating, setIsCalibrating] = useState(false);
+  const [rawTilt, setRawTilt] = useState<TiltInput>({ x: 0, y: 0 });
   const subscriptionRef = useRef<ReturnType<typeof Accelerometer.addListener> | null>(null);
+  const rawSubscriptionRef = useRef<ReturnType<typeof Accelerometer.addListener> | null>(null);
+
+  // Start listening to raw tilt data for visualization
+  useEffect(() => {
+    let mounted = true;
+
+    const setupRawListener = async () => {
+      try {
+        const available = await Accelerometer.isAvailableAsync();
+        if (!available || !mounted) return;
+
+        Accelerometer.setUpdateInterval(50);
+
+        rawSubscriptionRef.current = Accelerometer.addListener((data) => {
+          if (mounted) {
+            setRawTilt({
+              x: data.x,
+              y: data.y,
+            });
+          }
+        });
+      } catch {
+        // Accelerometer not available
+      }
+    };
+
+    setupRawListener();
+
+    return () => {
+      mounted = false;
+      if (rawSubscriptionRef.current) {
+        rawSubscriptionRef.current.remove();
+        rawSubscriptionRef.current = null;
+      }
+    };
+  }, []);
 
   const startCalibration = useCallback(() => {
     setMeasurements([]);
@@ -139,5 +177,6 @@ export function useCalibration() {
     getCalibrationData,
     isCalibrating,
     sampleCount: measurements.length,
+    rawTilt,
   };
 }
