@@ -33,7 +33,7 @@ import {
 } from '../../game';
 import { CLOUD9_COLORS, MARBLE_COLORS } from '../../game/constants/cloud9';
 
-type Cloud9GameState = 'playing' | 'paused' | 'completed';
+type Cloud9GameState = 'loading' | 'playing' | 'paused' | 'completed';
 
 // Marble Status Indicator - Instant completion feedback
 interface MarbleStatusProps {
@@ -150,7 +150,7 @@ export default function Cloud9GameScreen() {
 
   // Game state
   const [level, setLevel] = useState<MultiMarbleLevel | null>(null);
-  const [gameState, setGameState] = useState<Cloud9GameState>('playing');
+  const [gameState, setGameState] = useState<Cloud9GameState>('loading');
   const [marbles, setMarbles] = useState<MultiMarbleState[]>([]);
   const [elapsedTime, setElapsedTime] = useState(0);
   const [showCelebration, setShowCelebration] = useState(false);
@@ -182,7 +182,7 @@ export default function Cloud9GameScreen() {
   const marblesRef = useRef<MultiMarbleState[]>([]);
   const tiltRef = useRef({ x: 0, y: 0 });
   const joystickInputRef = useRef<JoystickInput>({ x: 0, y: 0, active: false });
-  const gameStateRef = useRef<Cloud9GameState>('playing');
+  const gameStateRef = useRef<Cloud9GameState>('loading');
   const levelRef = useRef<MultiMarbleLevel | null>(null);
 
   // Tilt sensor
@@ -232,8 +232,11 @@ export default function Cloud9GameScreen() {
     const engine = new MultiMarblePhysicsEngine(loadedLevel, settings.tiltSensitivity);
     physicsEngineRef.current = engine;
 
+    // Sync refs immediately for the game loop (don't wait for effect cycle)
+    levelRef.current = loadedLevel;
+    marblesRef.current = initialMarbles;
+
     // Reset game state
-    setGameState('playing');
     setElapsedTime(0);
     setShowCelebration(false);
     setCompletionResult(null);
@@ -241,6 +244,10 @@ export default function Cloud9GameScreen() {
     finalTimeRef.current = null;
     startTimeRef.current = Date.now();
     lastUpdateRef.current = Date.now();
+
+    // Set to playing AFTER everything is initialized
+    // This triggers the game loop effect
+    setGameState('playing');
 
     return () => {
       if (gameLoopRef.current) {
@@ -338,9 +345,9 @@ export default function Cloud9GameScreen() {
         // Schedule respawn for dead marbles
         setTimeout(() => {
           if (physicsEngineRef.current) {
-            setMarbles((prev) =>
-              physicsEngineRef.current!.respawnAllDeadMarbles(prev)
-            );
+            const respawnedMarbles = physicsEngineRef.current.respawnAllDeadMarbles(marblesRef.current);
+            marblesRef.current = respawnedMarbles;
+            setMarbles(respawnedMarbles);
           }
         }, PHYSICS.pitRespawnDelay);
       }
@@ -364,7 +371,8 @@ export default function Cloud9GameScreen() {
         return; // Stop the game loop
       }
 
-      // Update marbles state (this triggers re-render but NOT the game loop useEffect)
+      // Update marbles ref immediately for next frame, then update state for re-render
+      marblesRef.current = result.marbles;
       setMarbles(result.marbles);
 
       // Continue the loop
@@ -413,6 +421,9 @@ export default function Cloud9GameScreen() {
 
     const initialMarbles = createInitialMultiMarbleStates(level);
     setMarbles(initialMarbles);
+
+    // Sync refs immediately for the game loop
+    marblesRef.current = initialMarbles;
 
     if (physicsEngineRef.current) {
       physicsEngineRef.current.resetCheckpoints();
@@ -571,9 +582,9 @@ export default function Cloud9GameScreen() {
         style={[
           styles.overlay,
           { opacity: overlayOpacity },
-          gameState === 'playing' && styles.overlayHidden,
+          (gameState === 'playing' || gameState === 'loading') && styles.overlayHidden,
         ]}
-        pointerEvents={gameState === 'playing' ? 'none' : 'auto'}
+        pointerEvents={(gameState === 'playing' || gameState === 'loading') ? 'none' : 'auto'}
       >
         <LinearGradient
           colors={['rgba(255,255,255,0.98)', 'rgba(248,250,252,0.98)']}
