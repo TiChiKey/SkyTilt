@@ -68,7 +68,7 @@ export default function RootLayout() {
         <View style={styles.loadingContent}>
           <Animated.View style={styles.loadingLogo}>
             <Image
-              source={require('../assets/images/cloud9-logo.png')}
+              source={require('../assets/images/cloud9-logo-new.png')}
               style={styles.loadingLogoImage}
               resizeMode="contain"
             />
@@ -136,8 +136,8 @@ const styles = StyleSheet.create({
     elevation: 6,
   },
   loadingLogoImage: {
-    width: 120,
-    height: 120,
+    width: 180,
+    height: 180,
   },
   spinner: {
     transform: [{ scale: 1.2 }],

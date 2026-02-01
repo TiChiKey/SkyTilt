@@ -19,12 +19,12 @@ import {
 import { CLOUD9_COLORS, MARBLE_COLORS } from '../game/constants/cloud9';
 import { MULTI_MARBLE_LEVELS } from '../game/levels/multiMarbleLevels';
 
-// Cloud9 Logo Component - Using official branding asset
+// Cloud9 Logo Component - Using official branding asset with icon and text
 function Cloud9LogoLarge({ size }: { size: number }) {
   const logoScale = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
-    // Subtle breathing animation for the logo
+    // Subtle breathing animation for the logo - premium feel
     Animated.loop(
       Animated.sequence([
         Animated.timing(logoScale, {
@@ -41,6 +41,9 @@ function Cloud9LogoLarge({ size }: { size: number }) {
     ).start();
   }, []);
 
+  // The new logo includes both icon and brand text, so we use a taller aspect ratio
+  const logoHeight = size * 1.1;
+
   return (
     <Animated.View
       style={[
@@ -49,10 +52,10 @@ function Cloud9LogoLarge({ size }: { size: number }) {
       ]}
     >
       <Image
-        source={require('../assets/images/cloud9-logo.png')}
+        source={require('../assets/images/cloud9-logo-new.png')}
         style={{
           width: size,
-          height: size,
+          height: logoHeight,
         }}
         resizeMode="contain"
       />
@@ -325,8 +328,7 @@ export default function Cloud9MainMenu() {
             },
           ]}
         >
-          <Cloud9LogoLarge size={Math.min(width * 0.45, 180)} />
-          <Text style={styles.title}>CLOUD9</Text>
+          <Cloud9LogoLarge size={Math.min(width * 0.55, 220)} />
           <Text style={styles.subtitle}>TRIPLE MARBLE CHALLENGE</Text>
           <ThreeMarblesDisplay size={Math.min(width * 0.5, 180)} />
         </Animated.View>
@@ -468,23 +470,17 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     shadowColor: CLOUD9_COLORS.primary,
     shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.3,
-    shadowRadius: 16,
+    shadowOpacity: 0.25,
+    shadowRadius: 20,
     elevation: 12,
   },
-  title: {
-    fontSize: 48,
-    fontWeight: '800',
-    color: CLOUD9_COLORS.primary,
-    letterSpacing: 8,
-    marginTop: 16,
-  },
   subtitle: {
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '600',
     color: CLOUD9_COLORS.textSecondary,
-    letterSpacing: 3,
-    marginTop: 4,
+    letterSpacing: 4,
+    marginTop: 8,
+    textTransform: 'uppercase',
   },
   marblesContainer: {
     flexDirection: 'row',
