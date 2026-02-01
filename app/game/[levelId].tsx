@@ -1,5 +1,5 @@
 // Cloud9 Triple-Marble Game Screen
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -178,11 +178,42 @@ export default function Cloud9GameScreen() {
   const startTimeRef = useRef<number>(0);
   const lastUpdateRef = useRef<number>(0);
 
+  // Refs to store current state for the game loop (prevents infinite re-renders)
+  const marblesRef = useRef<MultiMarbleState[]>([]);
+  const tiltRef = useRef({ x: 0, y: 0 });
+  const joystickInputRef = useRef<JoystickInput>({ x: 0, y: 0, active: false });
+  const gameStateRef = useRef<Cloud9GameState>('playing');
+  const levelRef = useRef<MultiMarbleLevel | null>(null);
+
   // Tilt sensor
   const { tilt } = useTiltSensor({
     calibration,
     enabled: gameState === 'playing',
   });
+
+  // Keep refs in sync with state (for game loop to read latest values)
+  useEffect(() => {
+    marblesRef.current = marbles;
+  }, [marbles]);
+
+  useEffect(() => {
+    tiltRef.current = tilt;
+  }, [tilt]);
+
+  useEffect(() => {
+    joystickInputRef.current = joystickInput;
+  }, [joystickInput]);
+
+  useEffect(() => {
+    gameStateRef.current = gameState;
+  }, [gameState]);
+
+  useEffect(() => {
+    levelRef.current = level;
+  }, [level]);
+
+  // Ref for level complete handler (to avoid stale closure in game loop)
+  const handleLevelCompleteRef = useRef<() => void>(() => {});
 
   // Initialize level
   useEffect(() => {
@@ -218,13 +249,56 @@ export default function Cloud9GameScreen() {
     };
   }, [levelId]);
 
-  // Game loop
+  // Handle level completion - INSTANT when all marbles reach goals
+  // Defined before game loop to avoid hoisting issues
+  const handleLevelComplete = useCallback(async () => {
+    const currentLevel = levelRef.current;
+    if (!currentLevel) return;
+
+    // Immediately stop the game loop by setting state
+    setGameState('completed');
+
+    // Instant haptic and audio feedback
+    haptics.goal();
+    sounds.playGoal();
+    setShowCelebration(true);
+
+    // Use the precise captured time (already set in finalTimeRef)
+    const finalTime = finalTimeRef.current ?? (Date.now() - startTimeRef.current);
+    const result = await completeLevel(currentLevel.id, finalTime, currentLevel.baseTime);
+    setCompletionResult(result);
+
+    // Snappy transition to completion overlay
+    Animated.timing(overlayOpacity, {
+      toValue: 1,
+      duration: 300,
+      useNativeDriver: true,
+    }).start();
+  }, [completeLevel, haptics, sounds, overlayOpacity]);
+
+  // Keep ref updated with latest handler
   useEffect(() => {
-    if (gameState !== 'playing' || marbles.length === 0 || !physicsEngineRef.current) {
+    handleLevelCompleteRef.current = handleLevelComplete;
+  }, [handleLevelComplete]);
+
+  // Game loop - uses refs to avoid infinite re-render loop
+  useEffect(() => {
+    // Only start game loop when playing and initialized
+    if (gameState !== 'playing') {
+      return;
+    }
+
+    // Wait for level and marbles to be initialized
+    if (!levelRef.current || marblesRef.current.length === 0 || !physicsEngineRef.current) {
       return;
     }
 
     const gameLoop = () => {
+      // Check if we should still be running (using ref for latest state)
+      if (gameStateRef.current !== 'playing' || !physicsEngineRef.current) {
+        return;
+      }
+
       const now = Date.now();
       const deltaTime = Math.min((now - lastUpdateRef.current) / 1000, 0.05);
       lastUpdateRef.current = now;
@@ -232,11 +306,16 @@ export default function Cloud9GameScreen() {
       // Update elapsed time
       setElapsedTime(now - startTimeRef.current);
 
+      // Read current state from refs (not from closure)
+      const currentMarbles = marblesRef.current;
+      const currentTilt = tiltRef.current;
+      const currentJoystick = joystickInputRef.current;
+
       // Update physics for all marbles
-      const result = physicsEngineRef.current!.update(
-        marbles,
-        tilt,
-        settings.virtualJoystickEnabled ? joystickInput : null,
+      const result = physicsEngineRef.current.update(
+        currentMarbles,
+        currentTilt,
+        settings.virtualJoystickEnabled ? currentJoystick : null,
         deltaTime
       );
 
@@ -268,7 +347,7 @@ export default function Cloud9GameScreen() {
 
       // Play feedback when a marble enters its goal
       for (const marble of result.marbles) {
-        const prevMarble = marbles.find(m => m.id === marble.id);
+        const prevMarble = currentMarbles.find(m => m.id === marble.id);
         if (marble.isInGoal && prevMarble && !prevMarble.isInGoal) {
           // Marble just entered goal - instant feedback
           haptics.checkpoint();
@@ -277,50 +356,31 @@ export default function Cloud9GameScreen() {
       }
 
       // INSTANT COMPLETION: Check if all marbles are in their goals
-      if (result.allGoalsComplete && gameState === 'playing' && !finalTimeRef.current) {
+      if (result.allGoalsComplete && gameStateRef.current === 'playing' && !finalTimeRef.current) {
         // Capture the EXACT millisecond of completion
         finalTimeRef.current = now - startTimeRef.current;
         setElapsedTime(finalTimeRef.current);
-        handleLevelComplete();
+        handleLevelCompleteRef.current();
+        return; // Stop the game loop
       }
 
+      // Update marbles state (this triggers re-render but NOT the game loop useEffect)
       setMarbles(result.marbles);
+
+      // Continue the loop
       gameLoopRef.current = requestAnimationFrame(gameLoop);
     };
 
+    // Start the game loop
     gameLoopRef.current = requestAnimationFrame(gameLoop);
 
     return () => {
       if (gameLoopRef.current) {
         cancelAnimationFrame(gameLoopRef.current);
+        gameLoopRef.current = null;
       }
     };
-  }, [gameState, marbles, tilt, joystickInput, settings.virtualJoystickEnabled, level]);
-
-  // Handle level completion - INSTANT when all marbles reach goals
-  const handleLevelComplete = useCallback(async () => {
-    if (!level) return;
-
-    // Immediately stop the game loop by setting state
-    setGameState('completed');
-
-    // Instant haptic and audio feedback
-    haptics.goal();
-    sounds.playGoal();
-    setShowCelebration(true);
-
-    // Use the precise captured time (already set in finalTimeRef)
-    const finalTime = finalTimeRef.current ?? (Date.now() - startTimeRef.current);
-    const result = await completeLevel(level.id, finalTime, level.baseTime);
-    setCompletionResult(result);
-
-    // Snappy transition to completion overlay
-    Animated.timing(overlayOpacity, {
-      toValue: 1,
-      duration: 300,
-      useNativeDriver: true,
-    }).start();
-  }, [level, completeLevel, haptics, sounds]);
+  }, [gameState, settings.virtualJoystickEnabled, haptics, sounds]);
 
   // Handle pause
   const handlePause = () => {
@@ -410,6 +470,14 @@ export default function Cloud9GameScreen() {
     };
   };
 
+  // Memoized callback and Set to prevent unnecessary re-renders
+  const handleCelebrationComplete = useCallback(() => {
+    setShowCelebration(false);
+  }, []);
+
+  // Empty set that doesn't change reference
+  const emptyCheckpointsSet = useMemo(() => new Set<string>(), []);
+
   if (!level || marbles.length === 0) {
     return (
       <View style={[styles.container, styles.loading]}>
@@ -434,8 +502,8 @@ export default function Cloud9GameScreen() {
         level={level}
         marbles={marbles}
         showCelebration={showCelebration}
-        onCelebrationComplete={() => setShowCelebration(false)}
-        activatedCheckpoints={new Set()}
+        onCelebrationComplete={handleCelebrationComplete}
+        activatedCheckpoints={emptyCheckpointsSet}
         completedGoals={completedGoals}
       />
 

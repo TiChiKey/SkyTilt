@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { Circle, Group } from '@shopify/react-native-skia';
 import { Vector2D, RippleEffect as RippleType } from '../types';
 import { COLORS } from '../constants';
@@ -20,20 +20,40 @@ export function RippleEffectComponent({
 }: RippleEffectProps) {
   const [ripples, setRipples] = useState<RippleType[]>([]);
 
+  // Use refs to avoid effect re-triggering when position/onComplete change reference
+  const positionRef = useRef(position);
+  const onCompleteRef = useRef(onComplete);
+  const hasCompletedRef = useRef(false);
+
+  // Keep refs in sync
+  useEffect(() => {
+    positionRef.current = position;
+  }, [position]);
+
+  useEffect(() => {
+    onCompleteRef.current = onComplete;
+  }, [onComplete]);
+
+  // Main effect only depends on `active` to prevent infinite loops
   useEffect(() => {
     if (!active) {
       setRipples([]);
+      hasCompletedRef.current = false;
       return;
     }
 
+    // Reset completion flag when starting new animation
+    hasCompletedRef.current = false;
+
     // Create multiple ripples with staggered timing
+    const currentPosition = positionRef.current;
     const newRipples: RippleType[] = [];
     const rippleCount = 4;
 
     for (let i = 0; i < rippleCount; i++) {
       newRipples.push({
         id: `ripple-${i}`,
-        position: { ...position },
+        position: { ...currentPosition },
         radius: 0,
         maxRadius: 150 + i * 30,
         opacity: 1,
@@ -65,8 +85,15 @@ export function RippleEffectComponent({
           })
           .filter((ripple) => ripple.opacity > 0);
 
-        if (updated.length === 0 && onComplete) {
-          onComplete();
+        // Call onComplete only once when all ripples are done
+        if (updated.length === 0 && !hasCompletedRef.current) {
+          hasCompletedRef.current = true;
+          // Use setTimeout to avoid calling setState during render
+          setTimeout(() => {
+            if (onCompleteRef.current) {
+              onCompleteRef.current();
+            }
+          }, 0);
         }
 
         return updated;
@@ -80,7 +107,7 @@ export function RippleEffectComponent({
     return () => {
       cancelAnimationFrame(animationFrame);
     };
-  }, [active, position, onComplete]);
+  }, [active]); // Only depend on `active` to prevent infinite re-renders
 
   if (!active || ripples.length === 0) {
     return null;

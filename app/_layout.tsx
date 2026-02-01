@@ -129,15 +129,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 32,
-    shadowColor: CLOUD9_COLORS.primary,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 6,
+    // No shadow to ensure seamless blending with white background
   },
   loadingLogoImage: {
     width: 180,
     height: 180,
+    backgroundColor: 'transparent',
   },
   spinner: {
     transform: [{ scale: 1.2 }],

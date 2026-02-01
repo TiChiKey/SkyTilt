@@ -56,6 +56,7 @@ function Cloud9LogoLarge({ size }: { size: number }) {
         style={{
           width: size,
           height: logoHeight,
+          backgroundColor: 'transparent',
         }}
         resizeMode="contain"
       />
@@ -468,11 +469,7 @@ const styles = StyleSheet.create({
   logoContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: CLOUD9_COLORS.primary,
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.25,
-    shadowRadius: 20,
-    elevation: 12,
+    // No shadow to ensure seamless blending with white background
   },
   subtitle: {
     fontSize: 13,
