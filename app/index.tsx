@@ -6,11 +6,11 @@ import {
   StyleSheet,
   Animated,
   useWindowDimensions,
+  Image,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import Svg, { Path, Circle, Defs, RadialGradient, Stop } from 'react-native-svg';
 import {
   useProgress,
   useCalibrationData,
@@ -19,31 +19,44 @@ import {
 import { CLOUD9_COLORS, MARBLE_COLORS } from '../game/constants/cloud9';
 import { MULTI_MARBLE_LEVELS } from '../game/levels/multiMarbleLevels';
 
-// Cloud9 Logo Component
+// Cloud9 Logo Component - Using official branding asset
 function Cloud9LogoLarge({ size }: { size: number }) {
+  const logoScale = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    // Subtle breathing animation for the logo
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(logoScale, {
+          toValue: 1.02,
+          duration: 2000,
+          useNativeDriver: true,
+        }),
+        Animated.timing(logoScale, {
+          toValue: 1,
+          duration: 2000,
+          useNativeDriver: true,
+        }),
+      ])
+    ).start();
+  }, []);
+
   return (
-    <Svg width={size} height={size * 0.7} viewBox="0 0 200 140">
-      <Defs>
-        <RadialGradient id="logoGradient" cx="50%" cy="50%" r="50%">
-          <Stop offset="0%" stopColor={CLOUD9_COLORS.primaryLight} />
-          <Stop offset="100%" stopColor={CLOUD9_COLORS.primary} />
-        </RadialGradient>
-      </Defs>
-      {/* Cloud9-inspired logo path */}
-      <Path
-        d="M60 70 C60 40, 90 20, 100 50 C110 20, 140 40, 140 70 C160 70, 180 90, 160 110 C180 130, 140 140, 100 120 C60 140, 20 130, 40 110 C20 90, 40 70, 60 70 Z"
-        fill="url(#logoGradient)"
+    <Animated.View
+      style={[
+        styles.logoContainer,
+        { transform: [{ scale: logoScale }] }
+      ]}
+    >
+      <Image
+        source={require('../assets/images/cloud9-logo.png')}
+        style={{
+          width: size,
+          height: size,
+        }}
+        resizeMode="contain"
       />
-      {/* Number 9 inside */}
-      <Circle cx="100" cy="75" r="20" fill={CLOUD9_COLORS.white} />
-      <Circle cx="100" cy="75" r="12" fill={CLOUD9_COLORS.primary} />
-      <Path
-        d="M100 85 L100 110"
-        stroke={CLOUD9_COLORS.white}
-        strokeWidth="8"
-        strokeLinecap="round"
-      />
-    </Svg>
+    </Animated.View>
   );
 }
 
@@ -312,7 +325,7 @@ export default function Cloud9MainMenu() {
             },
           ]}
         >
-          <Cloud9LogoLarge size={Math.min(width * 0.6, 220)} />
+          <Cloud9LogoLarge size={Math.min(width * 0.45, 180)} />
           <Text style={styles.title}>CLOUD9</Text>
           <Text style={styles.subtitle}>TRIPLE MARBLE CHALLENGE</Text>
           <ThreeMarblesDisplay size={Math.min(width * 0.5, 180)} />
@@ -447,8 +460,17 @@ const styles = StyleSheet.create({
   },
   logoSection: {
     alignItems: 'center',
-    paddingTop: 20,
+    paddingTop: 10,
     paddingBottom: 16,
+  },
+  logoContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: CLOUD9_COLORS.primary,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 16,
+    elevation: 12,
   },
   title: {
     fontSize: 48,

@@ -1,7 +1,7 @@
 // Cloud9 App Layout - Dedicated Triple-Marble Experience
 import React, { useEffect, useState, useRef } from 'react';
 import { Stack } from 'expo-router';
-import { View, ActivityIndicator, StyleSheet, Animated } from 'react-native';
+import { View, ActivityIndicator, StyleSheet, Animated, Image } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { gameStore } from '../game';
 import { CLOUD9_COLORS } from '../game/constants/cloud9';
@@ -66,11 +66,13 @@ export default function RootLayout() {
     return (
       <View style={styles.loading}>
         <View style={styles.loadingContent}>
-          <View style={styles.loadingLogo}>
-            <View style={[styles.loadingDot, { backgroundColor: CLOUD9_COLORS.marbleRed }]} />
-            <View style={[styles.loadingDot, { backgroundColor: CLOUD9_COLORS.marbleBlue }]} />
-            <View style={[styles.loadingDot, { backgroundColor: CLOUD9_COLORS.marbleGreen }]} />
-          </View>
+          <Animated.View style={styles.loadingLogo}>
+            <Image
+              source={require('../assets/images/cloud9-logo.png')}
+              style={styles.loadingLogoImage}
+              resizeMode="contain"
+            />
+          </Animated.View>
           <ActivityIndicator size="large" color={CLOUD9_COLORS.primary} style={styles.spinner} />
         </View>
         <StatusBar style="dark" />
@@ -124,18 +126,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   loadingLogo: {
-    flexDirection: 'row',
-    gap: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
     marginBottom: 32,
-  },
-  loadingDot: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    shadowOffset: { width: 0, height: 2 },
+    shadowColor: CLOUD9_COLORS.primary,
+    shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 4,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  loadingLogoImage: {
+    width: 120,
+    height: 120,
   },
   spinner: {
     transform: [{ scale: 1.2 }],
