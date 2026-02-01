@@ -394,3 +394,6 @@ export function getLevelById(id: string): Level | null {
 export function getTotalLevels(): number {
   return LEVELS.length;
 }
+
+// Re-export multi-marble levels
+export * from './multiMarbleLevels';

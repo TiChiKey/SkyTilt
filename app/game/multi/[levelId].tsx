@@ -1,3 +1,4 @@
+// Multi-Marble Game Screen - Cloud9 Mode
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View,
@@ -10,30 +11,30 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import {
-  COLORS,
   PHYSICS,
   Button,
   IconButton,
-  GameCanvas,
+  MultiMarbleGameCanvas,
   VirtualJoystick,
   CompletionStars,
-  Level,
-  MarbleState,
+  MultiMarbleLevel,
+  MultiMarbleState,
   JoystickInput,
-  GameState,
+  MultiMarbleGameState,
   StarRating,
-  getLevelById,
-  PhysicsEngine,
-  createInitialMarbleState,
+  getMultiMarbleLevelById,
+  MultiMarblePhysicsEngine,
+  createInitialMultiMarbleStates,
   useSettings,
   useCalibrationData,
   useProgress,
   useTiltSensor,
   useHaptics,
   useSound,
-} from '../../game';
+} from '../../../game';
+import { CLOUD9_COLORS, MARBLE_COLORS } from '../../../game/constants/cloud9';
 
-export default function GameScreen() {
+export default function MultiMarbleGameScreen() {
   const { levelId } = useLocalSearchParams<{ levelId: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -51,9 +52,9 @@ export default function GameScreen() {
   });
 
   // Game state
-  const [level, setLevel] = useState<Level | null>(null);
-  const [gameState, setGameState] = useState<GameState>('playing');
-  const [marble, setMarble] = useState<MarbleState | null>(null);
+  const [level, setLevel] = useState<MultiMarbleLevel | null>(null);
+  const [gameState, setGameState] = useState<MultiMarbleGameState>('playing');
+  const [marbles, setMarbles] = useState<MultiMarbleState[]>([]);
   const [elapsedTime, setElapsedTime] = useState(0);
   const [showCelebration, setShowCelebration] = useState(false);
   const [completionResult, setCompletionResult] = useState<{
@@ -63,6 +64,7 @@ export default function GameScreen() {
   const [activatedCheckpoints, setActivatedCheckpoints] = useState<Set<string>>(
     new Set()
   );
+  const [completedGoals, setCompletedGoals] = useState<Set<string>>(new Set());
   const [joystickInput, setJoystickInput] = useState<JoystickInput>({
     x: 0,
     y: 0,
@@ -74,7 +76,7 @@ export default function GameScreen() {
   const hudOpacity = useRef(new Animated.Value(1)).current;
 
   // Physics engine ref
-  const physicsEngineRef = useRef<PhysicsEngine | null>(null);
+  const physicsEngineRef = useRef<MultiMarblePhysicsEngine | null>(null);
   const gameLoopRef = useRef<number | null>(null);
   const startTimeRef = useRef<number>(0);
   const lastUpdateRef = useRef<number>(0);
@@ -89,17 +91,17 @@ export default function GameScreen() {
   useEffect(() => {
     if (!levelId) return;
 
-    const loadedLevel = getLevelById(levelId);
+    const loadedLevel = getMultiMarbleLevelById(levelId);
     if (!loadedLevel) {
       router.back();
       return;
     }
 
     setLevel(loadedLevel);
-    const initialMarble = createInitialMarbleState(loadedLevel);
-    setMarble(initialMarble);
+    const initialMarbles = createInitialMultiMarbleStates(loadedLevel);
+    setMarbles(initialMarbles);
 
-    const engine = new PhysicsEngine(loadedLevel, settings.tiltSensitivity);
+    const engine = new MultiMarblePhysicsEngine(loadedLevel, settings.tiltSensitivity);
     physicsEngineRef.current = engine;
 
     // Reset game state
@@ -108,6 +110,7 @@ export default function GameScreen() {
     setShowCelebration(false);
     setCompletionResult(null);
     setActivatedCheckpoints(new Set());
+    setCompletedGoals(new Set());
     startTimeRef.current = Date.now();
     lastUpdateRef.current = Date.now();
 
@@ -120,7 +123,7 @@ export default function GameScreen() {
 
   // Game loop
   useEffect(() => {
-    if (gameState !== 'playing' || !marble || !physicsEngineRef.current) {
+    if (gameState !== 'playing' || marbles.length === 0 || !physicsEngineRef.current) {
       return;
     }
 
@@ -132,52 +135,68 @@ export default function GameScreen() {
       // Update elapsed time
       setElapsedTime(now - startTimeRef.current);
 
-      // Update physics
+      // Update physics for all marbles
       const result = physicsEngineRef.current!.update(
-        marble,
+        marbles,
         tilt,
         settings.virtualJoystickEnabled ? joystickInput : null,
         deltaTime
       );
 
-      // Handle collision feedback
-      if (result.hitWall) {
+      // Handle wall collision feedback
+      if (result.wallCollisions.length > 0) {
         haptics.wallHit();
         sounds.playWallHit();
       }
 
-      // Handle death pit
-      if (result.hitPit) {
+      // Handle marble-to-marble collision feedback
+      if (result.marbleCollisions.length > 0) {
+        // Different haptic for marble collision
+        haptics.checkpoint();
+        // Could add a 'clink' sound here
+      }
+
+      // Handle pit falls
+      if (result.pitFalls.length > 0) {
         haptics.pitFall();
         sounds.playPitFall();
 
-        // Respawn after delay
+        // Schedule respawn for dead marbles
         setTimeout(() => {
           if (physicsEngineRef.current) {
-            const respawnedMarble = physicsEngineRef.current.respawnMarble(result.marble);
-            setMarble(respawnedMarble);
+            setMarbles((prev) =>
+              physicsEngineRef.current!.respawnAllDeadMarbles(prev)
+            );
           }
         }, PHYSICS.pitRespawnDelay);
       }
 
-      // Handle checkpoint
-      if (result.reachedCheckpoint) {
-        haptics.checkpoint();
+      // Handle goal reached
+      if (result.goalReached.length > 0) {
+        haptics.goal();
         sounds.playCheckpoint();
-        setActivatedCheckpoints((prev) => {
+        setCompletedGoals((prev) => {
           const next = new Set(prev);
-          next.add(result.reachedCheckpoint!.id);
+          result.goalReached.forEach((marbleId) => {
+            const marble = result.marbles.find((m) => m.id === marbleId);
+            if (marble) {
+              const goal = level?.goals.find((g) => g.colorId === marble.colorId);
+              if (goal) {
+                next.add(goal.id);
+              }
+            }
+          });
           return next;
         });
       }
 
-      // Handle goal
-      if (result.reachedGoal && gameState === 'playing') {
+      // Handle all goals complete
+      if (result.allGoalsComplete && gameState === 'playing') {
         handleLevelComplete();
         return;
       }
 
-      setMarble(result.marble);
+      setMarbles(result.marbles);
       gameLoopRef.current = requestAnimationFrame(gameLoop);
     };
 
@@ -188,7 +207,7 @@ export default function GameScreen() {
         cancelAnimationFrame(gameLoopRef.current);
       }
     };
-  }, [gameState, marble, tilt, joystickInput, settings.virtualJoystickEnabled]);
+  }, [gameState, marbles, tilt, joystickInput, settings.virtualJoystickEnabled, level]);
 
   // Handle level completion
   const handleLevelComplete = useCallback(async () => {
@@ -240,14 +259,15 @@ export default function GameScreen() {
     haptics.button();
     if (!level) return;
 
-    const initialMarble = createInitialMarbleState(level);
-    setMarble(initialMarble);
+    const initialMarbles = createInitialMultiMarbleStates(level);
+    setMarbles(initialMarbles);
 
     if (physicsEngineRef.current) {
       physicsEngineRef.current.resetCheckpoints();
     }
 
     setActivatedCheckpoints(new Set());
+    setCompletedGoals(new Set());
     setElapsedTime(0);
     setShowCelebration(false);
     setCompletionResult(null);
@@ -272,7 +292,6 @@ export default function GameScreen() {
   // Handle next level
   const handleNextLevel = () => {
     haptics.button();
-    // Navigate to level select to pick next level
     router.replace('/levels');
   };
 
@@ -289,7 +308,14 @@ export default function GameScreen() {
     return `${seconds}.${millis.toString().padStart(2, '0')}`;
   };
 
-  if (!level || !marble) {
+  // Get status of each marble
+  const getMarbleStatus = (colorId: 'red' | 'blue' | 'green') => {
+    const marble = marbles.find((m) => m.colorId === colorId);
+    if (!marble) return { inGoal: false, alive: false };
+    return { inGoal: marble.isInGoal, alive: marble.isAlive };
+  };
+
+  if (!level || marbles.length === 0) {
     return (
       <View style={[styles.container, styles.loading]}>
         <Text style={styles.loadingText}>Loading...</Text>
@@ -297,15 +323,20 @@ export default function GameScreen() {
     );
   }
 
+  const redStatus = getMarbleStatus('red');
+  const blueStatus = getMarbleStatus('blue');
+  const greenStatus = getMarbleStatus('green');
+
   return (
     <View style={styles.container}>
       {/* Game Canvas */}
-      <GameCanvas
+      <MultiMarbleGameCanvas
         level={level}
-        marble={marble}
+        marbles={marbles}
         showCelebration={showCelebration}
         onCelebrationComplete={() => setShowCelebration(false)}
         activatedCheckpoints={activatedCheckpoints}
+        completedGoals={completedGoals}
       />
 
       {/* HUD */}
@@ -318,7 +349,8 @@ export default function GameScreen() {
         <View style={styles.hudLeft}>
           <IconButton
             onPress={handlePause}
-            icon={<Ionicons name="pause" size={24} color={COLORS.white} />}
+            icon={<Ionicons name="pause" size={24} color={CLOUD9_COLORS.textPrimary} />}
+            style={styles.pauseButton}
           />
         </View>
 
@@ -328,20 +360,41 @@ export default function GameScreen() {
         </View>
 
         <View style={styles.hudRight}>
-          {/* Checkpoint indicator */}
-          <View style={styles.checkpointIndicator}>
-            <Ionicons
-              name="flag"
-              size={16}
-              color={
-                activatedCheckpoints.size > 0
-                  ? COLORS.checkpoint
-                  : COLORS.textMuted
-              }
-            />
-            <Text style={styles.checkpointCount}>
-              {activatedCheckpoints.size}/{level.checkpoints.length}
-            </Text>
+          {/* Marble status indicators */}
+          <View style={styles.marbleStatus}>
+            <View
+              style={[
+                styles.statusDot,
+                { backgroundColor: MARBLE_COLORS.red.main },
+                redStatus.inGoal && styles.statusDotComplete,
+              ]}
+            >
+              {redStatus.inGoal && (
+                <Ionicons name="checkmark" size={10} color={CLOUD9_COLORS.white} />
+              )}
+            </View>
+            <View
+              style={[
+                styles.statusDot,
+                { backgroundColor: MARBLE_COLORS.blue.main },
+                blueStatus.inGoal && styles.statusDotComplete,
+              ]}
+            >
+              {blueStatus.inGoal && (
+                <Ionicons name="checkmark" size={10} color={CLOUD9_COLORS.white} />
+              )}
+            </View>
+            <View
+              style={[
+                styles.statusDot,
+                { backgroundColor: MARBLE_COLORS.green.main },
+                greenStatus.inGoal && styles.statusDotComplete,
+              ]}
+            >
+              {greenStatus.inGoal && (
+                <Ionicons name="checkmark" size={10} color={CLOUD9_COLORS.white} />
+              )}
+            </View>
           </View>
         </View>
       </Animated.View>
@@ -372,7 +425,7 @@ export default function GameScreen() {
         pointerEvents={gameState === 'playing' ? 'none' : 'auto'}
       >
         <LinearGradient
-          colors={['rgba(10,22,34,0.95)', 'rgba(20,40,58,0.95)']}
+          colors={['rgba(255,255,255,0.98)', 'rgba(248,250,252,0.98)']}
           style={styles.overlayGradient}
         >
           {/* Pause Menu */}
@@ -382,15 +435,15 @@ export default function GameScreen() {
 
               <View style={styles.pauseStats}>
                 <View style={styles.pauseStat}>
-                  <Ionicons name="time" size={20} color={COLORS.skyBlue} />
+                  <Ionicons name="time" size={20} color={CLOUD9_COLORS.primary} />
                   <Text style={styles.pauseStatValue}>
                     {formatTime(elapsedTime)}
                   </Text>
                 </View>
                 <View style={styles.pauseStat}>
-                  <Ionicons name="flag" size={20} color={COLORS.checkpoint} />
+                  <Ionicons name="flag" size={20} color={CLOUD9_COLORS.success} />
                   <Text style={styles.pauseStatValue}>
-                    {activatedCheckpoints.size}/{level.checkpoints.length}
+                    {completedGoals.size}/{level.goals.length}
                   </Text>
                 </View>
               </View>
@@ -401,7 +454,7 @@ export default function GameScreen() {
                   onPress={handleResume}
                   size="large"
                   icon={
-                    <Ionicons name="play" size={22} color={COLORS.white} />
+                    <Ionicons name="play" size={22} color={CLOUD9_COLORS.white} />
                   }
                 />
                 <Button
@@ -413,7 +466,7 @@ export default function GameScreen() {
                     <Ionicons
                       name="refresh"
                       size={20}
-                      color={COLORS.skyBlue}
+                      color={CLOUD9_COLORS.primary}
                     />
                   }
                 />
@@ -443,7 +496,7 @@ export default function GameScreen() {
                 </View>
                 {completionResult.isNewBest && (
                   <View style={styles.newBestBadge}>
-                    <Ionicons name="trophy" size={16} color={COLORS.gold} />
+                    <Ionicons name="trophy" size={16} color={CLOUD9_COLORS.warning} />
                     <Text style={styles.newBestText}>New Best!</Text>
                   </View>
                 )}
@@ -464,7 +517,7 @@ export default function GameScreen() {
                     <Ionicons
                       name="arrow-forward"
                       size={22}
-                      color={COLORS.white}
+                      color={CLOUD9_COLORS.white}
                     />
                   }
                 />
@@ -477,7 +530,7 @@ export default function GameScreen() {
                     <Ionicons
                       name="refresh"
                       size={20}
-                      color={COLORS.skyBlue}
+                      color={CLOUD9_COLORS.primary}
                     />
                   }
                 />
@@ -499,14 +552,14 @@ export default function GameScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.bgDark,
+    backgroundColor: CLOUD9_COLORS.background,
   },
   loading: {
     justifyContent: 'center',
     alignItems: 'center',
   },
   loadingText: {
-    color: COLORS.textSecondary,
+    color: CLOUD9_COLORS.textSecondary,
     fontSize: 18,
   },
   hud: {
@@ -531,30 +584,39 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'flex-end',
   },
+  pauseButton: {
+    backgroundColor: CLOUD9_COLORS.overlayLight,
+  },
   levelName: {
     fontSize: 14,
-    color: COLORS.textSecondary,
+    color: CLOUD9_COLORS.textSecondary,
     fontWeight: '500',
   },
   timer: {
     fontSize: 32,
-    color: COLORS.white,
+    color: CLOUD9_COLORS.textPrimary,
     fontWeight: '700',
     fontVariant: ['tabular-nums'],
   },
-  checkpointIndicator: {
+  marbleStatus: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    backgroundColor: COLORS.overlayDark,
-    paddingVertical: 6,
-    paddingHorizontal: 10,
-    borderRadius: 12,
+    gap: 6,
+    backgroundColor: CLOUD9_COLORS.overlayLight,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 16,
   },
-  checkpointCount: {
-    color: COLORS.textSecondary,
-    fontSize: 13,
-    fontWeight: '500',
+  statusDot: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  statusDotComplete: {
+    borderWidth: 2,
+    borderColor: CLOUD9_COLORS.success,
   },
   joystickContainer: {
     position: 'absolute',
@@ -581,7 +643,7 @@ const styles = StyleSheet.create({
   overlayTitle: {
     fontSize: 36,
     fontWeight: '700',
-    color: COLORS.white,
+    color: CLOUD9_COLORS.textPrimary,
     marginBottom: 24,
   },
   pauseStats: {
@@ -593,13 +655,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    backgroundColor: COLORS.overlayDark,
+    backgroundColor: CLOUD9_COLORS.overlayLight,
     paddingVertical: 10,
     paddingHorizontal: 16,
     borderRadius: 12,
   },
   pauseStatValue: {
-    color: COLORS.white,
+    color: CLOUD9_COLORS.textPrimary,
     fontSize: 18,
     fontWeight: '600',
   },
@@ -611,7 +673,7 @@ const styles = StyleSheet.create({
   completeTitle: {
     fontSize: 32,
     fontWeight: '700',
-    color: COLORS.white,
+    color: CLOUD9_COLORS.textPrimary,
     marginBottom: 8,
   },
   completeStats: {
@@ -623,11 +685,11 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   completeStatLabel: {
-    color: COLORS.textSecondary,
+    color: CLOUD9_COLORS.textSecondary,
     fontSize: 14,
   },
   completeStatValue: {
-    color: COLORS.white,
+    color: CLOUD9_COLORS.textPrimary,
     fontSize: 32,
     fontWeight: '700',
     fontVariant: ['tabular-nums'],
@@ -636,13 +698,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: 'rgba(255, 215, 0, 0.2)',
+    backgroundColor: 'rgba(255, 149, 0, 0.15)',
     paddingVertical: 6,
     paddingHorizontal: 12,
     borderRadius: 12,
   },
   newBestText: {
-    color: COLORS.gold,
+    color: CLOUD9_COLORS.warning,
     fontSize: 14,
     fontWeight: '600',
   },
@@ -650,7 +712,7 @@ const styles = StyleSheet.create({
     marginBottom: 32,
   },
   thresholdLabel: {
-    color: COLORS.textMuted,
+    color: CLOUD9_COLORS.textMuted,
     fontSize: 12,
     textAlign: 'center',
   },

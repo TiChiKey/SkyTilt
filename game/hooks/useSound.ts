@@ -94,6 +94,32 @@ export function useSound({ enabled, volume }: UseSoundOptions) {
     // Play button click sound
   }, [enabled, volume]);
 
+  // Marble-to-marble collision sound (clink)
+  const playMarbleClink = useCallback(async () => {
+    if (!enabled || Platform.OS === 'web') return;
+
+    // Throttle collision sounds
+    const now = Date.now();
+    if (now - lastCollisionRef.current < 60) return;
+    lastCollisionRef.current = now;
+
+    // In a real app, you'd play a glass/marble clink sound file
+    // For now, we rely on haptics for feedback
+  }, [enabled, volume]);
+
+  // Wall thud sound (heavier than clink)
+  const playWallThud = useCallback(async () => {
+    if (!enabled || Platform.OS === 'web') return;
+
+    // Throttle collision sounds
+    const now = Date.now();
+    if (now - lastCollisionRef.current < 80) return;
+    lastCollisionRef.current = now;
+
+    // In a real app, you'd play a soft thud sound file
+    // For now, we rely on haptics for feedback
+  }, [enabled, volume]);
+
   return {
     playWallHit,
     playRolling,
@@ -102,5 +128,7 @@ export function useSound({ enabled, volume }: UseSoundOptions) {
     playGoal,
     playPitFall,
     playButton,
+    playMarbleClink,
+    playWallThud,
   };
 }

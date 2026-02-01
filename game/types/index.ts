@@ -141,3 +141,6 @@ export interface RippleEffect {
   opacity: number;
   startTime: number;
 }
+
+// Re-export multi-marble types
+export * from './multiMarble';

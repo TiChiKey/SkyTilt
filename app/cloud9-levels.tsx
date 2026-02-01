@@ -1,3 +1,4 @@
+// Cloud9 Multi-Marble Level Selection Screen
 import React from 'react';
 import {
   View,
@@ -7,21 +8,22 @@ import {
   TouchableOpacity,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import {
-  COLORS,
   IconButton,
   StarRatingDisplay,
+  Cloud9Logo,
+  ThreeMarblesIcon,
   useProgress,
   useHaptics,
-  LEVELS,
-  Level,
+  MULTI_MARBLE_LEVELS,
+  MultiMarbleLevel,
 } from '../game';
+import { CLOUD9_COLORS, MARBLE_COLORS } from '../game/constants/cloud9';
 
 interface LevelCardProps {
-  level: Level;
+  level: MultiMarbleLevel;
   index: number;
   isUnlocked: boolean;
   stars: 0 | 1 | 2 | 3;
@@ -45,13 +47,13 @@ function LevelCard({
 
   const getDifficultyColor = (difficulty: number): string => {
     const colors = {
-      1: COLORS.success,
+      1: CLOUD9_COLORS.success,
       2: '#4CAF50',
-      3: COLORS.warning,
+      3: CLOUD9_COLORS.warning,
       4: '#FF9800',
-      5: COLORS.error,
+      5: CLOUD9_COLORS.error,
     };
-    return colors[difficulty as keyof typeof colors] || COLORS.textMuted;
+    return colors[difficulty as keyof typeof colors] || CLOUD9_COLORS.gray;
   };
 
   return (
@@ -60,21 +62,12 @@ function LevelCard({
       disabled={!isUnlocked}
       activeOpacity={0.8}
     >
-      <LinearGradient
-        colors={
-          isUnlocked
-            ? [COLORS.charcoalLight, COLORS.charcoal]
-            : ['rgba(30,30,46,0.5)', 'rgba(26,26,46,0.5)']
-        }
-        style={[styles.card, !isUnlocked && styles.cardLocked]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-      >
-        {/* Level number */}
+      <View style={[styles.card, !isUnlocked && styles.cardLocked]}>
+        {/* Level number with Cloud9 styling */}
         <View
           style={[
             styles.levelNumber,
-            { backgroundColor: isUnlocked ? COLORS.skyBlue : COLORS.textMuted },
+            { backgroundColor: isUnlocked ? CLOUD9_COLORS.primary : CLOUD9_COLORS.gray },
           ]}
         >
           <Text style={styles.levelNumberText}>{index + 1}</Text>
@@ -101,7 +94,7 @@ function LevelCard({
                       backgroundColor:
                         d <= level.difficulty
                           ? getDifficultyColor(level.difficulty)
-                          : COLORS.textMuted,
+                          : CLOUD9_COLORS.grayLight,
                     },
                   ]}
                 />
@@ -120,10 +113,17 @@ function LevelCard({
             </View>
           ) : (
             <View style={styles.lockedOverlay}>
-              <Ionicons name="lock-closed" size={20} color={COLORS.textMuted} />
+              <Ionicons name="lock-closed" size={20} color={CLOUD9_COLORS.gray} />
               <Text style={styles.lockedText}>Complete previous level</Text>
             </View>
           )}
+
+          {/* Three marble indicator */}
+          <View style={styles.marbleIndicator}>
+            <View style={[styles.marbleDot, { backgroundColor: MARBLE_COLORS.red.main }]} />
+            <View style={[styles.marbleDot, { backgroundColor: MARBLE_COLORS.blue.main }]} />
+            <View style={[styles.marbleDot, { backgroundColor: MARBLE_COLORS.green.main }]} />
+          </View>
         </View>
 
         {/* Arrow indicator */}
@@ -131,25 +131,26 @@ function LevelCard({
           <Ionicons
             name="chevron-forward"
             size={24}
-            color={COLORS.skyBlue}
+            color={CLOUD9_COLORS.primary}
             style={styles.arrow}
           />
         )}
-      </LinearGradient>
+      </View>
     </TouchableOpacity>
   );
 }
 
-export default function LevelSelectScreen() {
+export default function Cloud9LevelSelectScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { progress, isLevelUnlocked } = useProgress();
+  const { progress } = useProgress();
   const haptics = useHaptics({ enabled: true });
 
-  const handleLevelPress = (level: Level, index: number) => {
-    if (!isLevelUnlocked(index)) return;
+  const handleLevelPress = (level: MultiMarbleLevel, index: number) => {
+    // For multi-marble mode, all levels are unlocked for testing
+    // In production, you might want: if (!isLevelUnlocked(index)) return;
     haptics.button();
-    router.push(`/game/${level.id}`);
+    router.push(`/game/multi/${level.id}`);
   };
 
   const handleBack = () => {
@@ -158,27 +159,42 @@ export default function LevelSelectScreen() {
   };
 
   return (
-    <LinearGradient
-      colors={[COLORS.bgDark, COLORS.bgMid]}
-      style={styles.container}
-    >
+    <View style={styles.container}>
       {/* Header */}
       <View style={[styles.header, { paddingTop: insets.top + 16 }]}>
         <IconButton
           onPress={handleBack}
-          icon={<Ionicons name="arrow-back" size={24} color={COLORS.white} />}
+          icon={<Ionicons name="arrow-back" size={24} color={CLOUD9_COLORS.textPrimary} />}
+          style={styles.backButton}
         />
-        <Text style={styles.title}>Select Level</Text>
+        <Text style={styles.title}>Cloud9 Mode</Text>
         <View style={{ width: 44 }} />
       </View>
 
-      {/* Progress summary */}
-      <View style={styles.progressSummary}>
-        <View style={styles.progressItem}>
-          <Ionicons name="star" size={20} color={COLORS.gold} />
-          <Text style={styles.progressValue}>{progress.totalStars}</Text>
-          <Text style={styles.progressLabel}>
-            / {LEVELS.length * 3} Stars
+      {/* Mode description */}
+      <View style={styles.modeDescription}>
+        <Cloud9Logo size={80} />
+        <View style={styles.modeInfo}>
+          <Text style={styles.modeTitle}>Multi-Marble Challenge</Text>
+          <Text style={styles.modeSubtitle}>
+            Control three marbles simultaneously!
+          </Text>
+        </View>
+        <ThreeMarblesIcon size={60} />
+      </View>
+
+      {/* Instructions */}
+      <View style={styles.instructions}>
+        <View style={styles.instructionItem}>
+          <Ionicons name="phone-portrait" size={20} color={CLOUD9_COLORS.primary} />
+          <Text style={styles.instructionText}>
+            All marbles respond to the same tilt
+          </Text>
+        </View>
+        <View style={styles.instructionItem}>
+          <Ionicons name="flag" size={20} color={CLOUD9_COLORS.success} />
+          <Text style={styles.instructionText}>
+            Guide each marble to its matching goal
           </Text>
         </View>
       </View>
@@ -192,14 +208,16 @@ export default function LevelSelectScreen() {
         ]}
         showsVerticalScrollIndicator={false}
       >
-        {LEVELS.map((level, index) => {
+        {MULTI_MARBLE_LEVELS.map((level, index) => {
           const levelProgress = progress.levels[level.id];
+          // For Cloud9 mode, unlock all levels for testing
+          const isUnlocked = true; // or isLevelUnlocked(index)
           return (
             <LevelCard
               key={level.id}
               level={level}
               index={index}
-              isUnlocked={isLevelUnlocked(index)}
+              isUnlocked={isUnlocked}
               stars={levelProgress?.starRating ?? 0}
               bestTime={levelProgress?.bestTime ?? null}
               onPress={() => handleLevelPress(level, index)}
@@ -207,13 +225,14 @@ export default function LevelSelectScreen() {
           );
         })}
       </ScrollView>
-    </LinearGradient>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: CLOUD9_COLORS.background,
   },
   header: {
     flexDirection: 'row',
@@ -222,35 +241,63 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingBottom: 16,
   },
+  backButton: {
+    backgroundColor: CLOUD9_COLORS.overlayLight,
+  },
   title: {
     fontSize: 24,
     fontWeight: '700',
-    color: COLORS.white,
+    color: CLOUD9_COLORS.textPrimary,
   },
-  progressSummary: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    paddingVertical: 16,
-    marginHorizontal: 20,
-    marginBottom: 8,
-    backgroundColor: COLORS.overlayDark,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: COLORS.skyBlueTranslucent,
-  },
-  progressItem: {
+  modeDescription: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    justifyContent: 'space-between',
+    paddingVertical: 20,
+    paddingHorizontal: 20,
+    marginHorizontal: 20,
+    marginBottom: 8,
+    backgroundColor: CLOUD9_COLORS.backgroundSecondary,
+    borderRadius: 20,
+    borderWidth: 2,
+    borderColor: CLOUD9_COLORS.primary,
   },
-  progressValue: {
-    fontSize: 20,
+  modeInfo: {
+    flex: 1,
+    alignItems: 'center',
+    paddingHorizontal: 16,
+  },
+  modeTitle: {
+    fontSize: 18,
     fontWeight: '700',
-    color: COLORS.white,
+    color: CLOUD9_COLORS.primary,
+    textAlign: 'center',
   },
-  progressLabel: {
-    fontSize: 14,
-    color: COLORS.textSecondary,
+  modeSubtitle: {
+    fontSize: 13,
+    color: CLOUD9_COLORS.textSecondary,
+    textAlign: 'center',
+    marginTop: 4,
+  },
+  instructions: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    marginHorizontal: 20,
+    marginBottom: 8,
+    backgroundColor: CLOUD9_COLORS.overlayLight,
+    borderRadius: 12,
+  },
+  instructionItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  instructionText: {
+    fontSize: 12,
+    color: CLOUD9_COLORS.textSecondary,
+    maxWidth: 120,
   },
   scrollView: {
     flex: 1,
@@ -264,12 +311,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 16,
     borderRadius: 16,
+    backgroundColor: CLOUD9_COLORS.backgroundSecondary,
     borderWidth: 1,
-    borderColor: COLORS.skyBlueTranslucent,
+    borderColor: CLOUD9_COLORS.primaryTranslucent,
   },
   cardLocked: {
-    opacity: 0.6,
-    borderColor: 'rgba(255,255,255,0.1)',
+    opacity: 0.5,
+    borderColor: CLOUD9_COLORS.grayLight,
   },
   levelNumber: {
     width: 44,
@@ -282,7 +330,7 @@ const styles = StyleSheet.create({
   levelNumberText: {
     fontSize: 18,
     fontWeight: '700',
-    color: COLORS.white,
+    color: CLOUD9_COLORS.white,
   },
   cardContent: {
     flex: 1,
@@ -296,10 +344,10 @@ const styles = StyleSheet.create({
   levelName: {
     fontSize: 18,
     fontWeight: '600',
-    color: COLORS.white,
+    color: CLOUD9_COLORS.textPrimary,
   },
   textLocked: {
-    color: COLORS.textMuted,
+    color: CLOUD9_COLORS.gray,
   },
   difficultyDots: {
     flexDirection: 'row',
@@ -317,7 +365,7 @@ const styles = StyleSheet.create({
   },
   bestTime: {
     fontSize: 13,
-    color: COLORS.textSecondary,
+    color: CLOUD9_COLORS.textSecondary,
   },
   lockedOverlay: {
     flexDirection: 'row',
@@ -326,7 +374,17 @@ const styles = StyleSheet.create({
   },
   lockedText: {
     fontSize: 13,
-    color: COLORS.textMuted,
+    color: CLOUD9_COLORS.gray,
+  },
+  marbleIndicator: {
+    flexDirection: 'row',
+    gap: 4,
+    marginTop: 8,
+  },
+  marbleDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
   },
   arrow: {
     marginLeft: 8,

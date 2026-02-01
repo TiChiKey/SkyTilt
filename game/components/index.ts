@@ -7,3 +7,8 @@ export * from './VirtualJoystick';
 export * from './OrbitLogo';
 export * from './Button';
 export * from './StarRating';
+// Multi-marble Cloud9 components
+export * from './MultiMarbleRenderer';
+export * from './Cloud9MazeRenderer';
+export * from './MultiMarbleGameCanvas';
+export * from './Cloud9Logo';

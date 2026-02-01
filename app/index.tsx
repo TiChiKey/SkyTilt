@@ -82,6 +82,15 @@ export default function MainMenu() {
     router.push('/settings');
   };
 
+  const handleCloud9Mode = () => {
+    haptics.button();
+    if (!calibration.isCalibrated) {
+      router.push('/calibration');
+    } else {
+      router.push('/cloud9-levels');
+    }
+  };
+
   const totalLevels = getTotalLevels();
   const completedLevels = Object.values(progress.levels).filter(
     (l) => l.completed
@@ -158,11 +167,19 @@ export default function MainMenu() {
           />
 
           <Button
-            title="Settings"
-            onPress={handleSettings}
+            title="Cloud9 Mode"
+            onPress={handleCloud9Mode}
             variant="secondary"
             size="medium"
-            icon={<Ionicons name="settings-outline" size={20} color={COLORS.skyBlue} />}
+            icon={<Ionicons name="cloudy" size={20} color={COLORS.skyBlue} />}
+          />
+
+          <Button
+            title="Settings"
+            onPress={handleSettings}
+            variant="ghost"
+            size="small"
+            icon={<Ionicons name="settings-outline" size={18} color={COLORS.textSecondary} />}
           />
         </Animated.View>
 

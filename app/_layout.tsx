@@ -35,10 +35,18 @@ export default function RootLayout() {
       >
         <Stack.Screen name="index" />
         <Stack.Screen name="levels" />
+        <Stack.Screen name="cloud9-levels" />
         <Stack.Screen name="calibration" />
         <Stack.Screen name="settings" />
         <Stack.Screen
           name="game/[levelId]"
+          options={{
+            gestureEnabled: false,
+            animation: 'fade',
+          }}
+        />
+        <Stack.Screen
+          name="game/multi/[levelId]"
           options={{
             gestureEnabled: false,
             animation: 'fade',
