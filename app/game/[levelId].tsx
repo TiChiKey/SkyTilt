@@ -33,37 +33,33 @@ import {
 } from '../../game';
 import { CLOUD9_COLORS, MARBLE_COLORS } from '../../game/constants/cloud9';
 
-// Constants
-const GOAL_HOLD_TIME = 2000; // 2 seconds to complete
-
 type Cloud9GameState = 'playing' | 'paused' | 'completed';
 
-// Pulsing Marble Status Indicator
+// Marble Status Indicator - Instant completion feedback
 interface MarbleStatusProps {
   colorId: 'red' | 'blue' | 'green';
   isInGoal: boolean;
-  holdProgress: number; // 0-1 progress toward goal completion
   isAlive: boolean;
 }
 
-function MarbleStatus({ colorId, isInGoal, holdProgress, isAlive }: MarbleStatusProps) {
+function MarbleStatus({ colorId, isInGoal, isAlive }: MarbleStatusProps) {
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const glowOpacity = useRef(new Animated.Value(0)).current;
   const pulseAnimationRef = useRef<Animated.CompositeAnimation | null>(null);
 
   useEffect(() => {
     if (isInGoal) {
-      // Start pulsing glow when in goal
+      // Instant glow when marble enters goal
       pulseAnimationRef.current = Animated.loop(
         Animated.sequence([
           Animated.timing(pulseAnim, {
             toValue: 1.2,
-            duration: 400,
+            duration: 300,
             useNativeDriver: true,
           }),
           Animated.timing(pulseAnim, {
             toValue: 1,
-            duration: 400,
+            duration: 300,
             useNativeDriver: true,
           }),
         ])
@@ -72,16 +68,15 @@ function MarbleStatus({ colorId, isInGoal, holdProgress, isAlive }: MarbleStatus
 
       Animated.timing(glowOpacity, {
         toValue: 1,
-        duration: 200,
+        duration: 150,
         useNativeDriver: true,
       }).start();
     } else {
-      // Stop the loop animation properly and reset with animation (not direct setValue)
+      // Stop the loop animation properly and reset with animation
       if (pulseAnimationRef.current) {
         pulseAnimationRef.current.stop();
         pulseAnimationRef.current = null;
       }
-      // Use animation to reset instead of direct setValue to avoid native driver conflict
       Animated.timing(pulseAnim, {
         toValue: 1,
         duration: 100,
@@ -90,12 +85,11 @@ function MarbleStatus({ colorId, isInGoal, holdProgress, isAlive }: MarbleStatus
 
       Animated.timing(glowOpacity, {
         toValue: 0,
-        duration: 200,
+        duration: 150,
         useNativeDriver: true,
       }).start();
     }
 
-    // Cleanup on unmount
     return () => {
       if (pulseAnimationRef.current) {
         pulseAnimationRef.current.stop();
@@ -120,7 +114,7 @@ function MarbleStatus({ colorId, isInGoal, holdProgress, isAlive }: MarbleStatus
         ]}
       />
 
-      {/* Main marble indicator */}
+      {/* Main marble indicator with instant checkmark when in goal */}
       <View
         style={[
           styles.statusDot,
@@ -129,25 +123,10 @@ function MarbleStatus({ colorId, isInGoal, holdProgress, isAlive }: MarbleStatus
           },
         ]}
       >
-        {isInGoal && holdProgress >= 1 && (
+        {isInGoal && (
           <Ionicons name="checkmark" size={12} color={CLOUD9_COLORS.white} />
         )}
       </View>
-
-      {/* Progress ring for goal hold */}
-      {isInGoal && holdProgress < 1 && (
-        <View style={styles.progressRing}>
-          <View
-            style={[
-              styles.progressArc,
-              {
-                borderColor: color.main,
-                transform: [{ rotate: `${holdProgress * 360}deg` }],
-              },
-            ]}
-          />
-        </View>
-      )}
     </View>
   );
 }
@@ -186,12 +165,8 @@ export default function Cloud9GameScreen() {
     active: false,
   });
 
-  // Goal hold tracking for timed validation
-  const [goalHoldTimes, setGoalHoldTimes] = useState<Record<string, number>>({
-    red: 0,
-    blue: 0,
-    green: 0,
-  });
+  // Track the exact time when level is completed for precise timing
+  const finalTimeRef = useRef<number | null>(null);
 
   // Animation values
   const overlayOpacity = useRef(new Animated.Value(0)).current;
@@ -232,7 +207,7 @@ export default function Cloud9GameScreen() {
     setShowCelebration(false);
     setCompletionResult(null);
     setCompletedGoals(new Set());
-    setGoalHoldTimes({ red: 0, blue: 0, green: 0 });
+    finalTimeRef.current = null;
     startTimeRef.current = Date.now();
     lastUpdateRef.current = Date.now();
 
@@ -252,7 +227,6 @@ export default function Cloud9GameScreen() {
     const gameLoop = () => {
       const now = Date.now();
       const deltaTime = Math.min((now - lastUpdateRef.current) / 1000, 0.05);
-      const deltaMs = now - lastUpdateRef.current;
       lastUpdateRef.current = now;
 
       // Update elapsed time
@@ -288,48 +262,27 @@ export default function Cloud9GameScreen() {
             setMarbles((prev) =>
               physicsEngineRef.current!.respawnAllDeadMarbles(prev)
             );
-            // Reset goal hold times for respawned marbles
-            setGoalHoldTimes({ red: 0, blue: 0, green: 0 });
           }
         }, PHYSICS.pitRespawnDelay);
       }
 
-      // Update goal hold times for timed validation
-      setGoalHoldTimes((prev) => {
-        const newHoldTimes = { ...prev };
-        let allComplete = true;
-
-        for (const marble of result.marbles) {
-          if (marble.isInGoal) {
-            // Increment hold time
-            newHoldTimes[marble.colorId] = Math.min(
-              prev[marble.colorId] + deltaMs,
-              GOAL_HOLD_TIME
-            );
-
-            // Check if this marble just completed (reached 2 seconds)
-            if (prev[marble.colorId] < GOAL_HOLD_TIME && newHoldTimes[marble.colorId] >= GOAL_HOLD_TIME) {
-              haptics.goal();
-              sounds.playCheckpoint();
-            }
-          } else {
-            // Reset hold time if marble leaves goal
-            newHoldTimes[marble.colorId] = 0;
-          }
-
-          // Check if all marbles have completed
-          if (newHoldTimes[marble.colorId] < GOAL_HOLD_TIME) {
-            allComplete = false;
-          }
+      // Play feedback when a marble enters its goal
+      for (const marble of result.marbles) {
+        const prevMarble = marbles.find(m => m.id === marble.id);
+        if (marble.isInGoal && prevMarble && !prevMarble.isInGoal) {
+          // Marble just entered goal - instant feedback
+          haptics.checkpoint();
+          sounds.playCheckpoint();
         }
+      }
 
-        // Check for level completion
-        if (allComplete && gameState === 'playing') {
-          handleLevelComplete();
-        }
-
-        return newHoldTimes;
-      });
+      // INSTANT COMPLETION: Check if all marbles are in their goals
+      if (result.allGoalsComplete && gameState === 'playing' && !finalTimeRef.current) {
+        // Capture the EXACT millisecond of completion
+        finalTimeRef.current = now - startTimeRef.current;
+        setElapsedTime(finalTimeRef.current);
+        handleLevelComplete();
+      }
 
       setMarbles(result.marbles);
       gameLoopRef.current = requestAnimationFrame(gameLoop);
@@ -344,23 +297,27 @@ export default function Cloud9GameScreen() {
     };
   }, [gameState, marbles, tilt, joystickInput, settings.virtualJoystickEnabled, level]);
 
-  // Handle level completion
+  // Handle level completion - INSTANT when all marbles reach goals
   const handleLevelComplete = useCallback(async () => {
     if (!level) return;
 
+    // Immediately stop the game loop by setting state
     setGameState('completed');
+
+    // Instant haptic and audio feedback
     haptics.goal();
     sounds.playGoal();
     setShowCelebration(true);
 
-    const finalTime = Date.now() - startTimeRef.current;
+    // Use the precise captured time (already set in finalTimeRef)
+    const finalTime = finalTimeRef.current ?? (Date.now() - startTimeRef.current);
     const result = await completeLevel(level.id, finalTime, level.baseTime);
     setCompletionResult(result);
 
-    // Show completion overlay
+    // Snappy transition to completion overlay
     Animated.timing(overlayOpacity, {
       toValue: 1,
-      duration: 400,
+      duration: 300,
       useNativeDriver: true,
     }).start();
   }, [level, completeLevel, haptics, sounds]);
@@ -402,7 +359,7 @@ export default function Cloud9GameScreen() {
     }
 
     setCompletedGoals(new Set());
-    setGoalHoldTimes({ red: 0, blue: 0, green: 0 });
+    finalTimeRef.current = null;
     setElapsedTime(0);
     setShowCelebration(false);
     setCompletionResult(null);
@@ -446,11 +403,10 @@ export default function Cloud9GameScreen() {
   // Get status of each marble
   const getMarbleStatus = (colorId: 'red' | 'blue' | 'green') => {
     const marble = marbles.find((m) => m.colorId === colorId);
-    if (!marble) return { inGoal: false, alive: false, holdProgress: 0 };
+    if (!marble) return { inGoal: false, alive: false };
     return {
       inGoal: marble.isInGoal,
       alive: marble.isAlive,
-      holdProgress: goalHoldTimes[colorId] / GOAL_HOLD_TIME,
     };
   };
 
@@ -504,39 +460,27 @@ export default function Cloud9GameScreen() {
         </View>
 
         <View style={styles.hudRight}>
-          {/* Enhanced marble status indicators with pulse animation */}
+          {/* Marble status indicators - instant completion feedback */}
           <View style={styles.marbleStatusContainer}>
             <MarbleStatus
               colorId="red"
               isInGoal={redStatus.inGoal}
-              holdProgress={redStatus.holdProgress}
               isAlive={redStatus.alive}
             />
             <MarbleStatus
               colorId="blue"
               isInGoal={blueStatus.inGoal}
-              holdProgress={blueStatus.holdProgress}
               isAlive={blueStatus.alive}
             />
             <MarbleStatus
               colorId="green"
               isInGoal={greenStatus.inGoal}
-              holdProgress={greenStatus.holdProgress}
               isAlive={greenStatus.alive}
             />
           </View>
         </View>
       </Animated.View>
 
-      {/* Goal hold instruction */}
-      {(redStatus.inGoal || blueStatus.inGoal || greenStatus.inGoal) &&
-       gameState === 'playing' && (
-        <View style={[styles.holdInstruction, { top: insets.top + 80 }]}>
-          <Text style={styles.holdInstructionText}>
-            Hold all marbles in goals for 2 seconds
-          </Text>
-        </View>
-      )}
 
       {/* Virtual Joystick */}
       {settings.virtualJoystickEnabled && gameState === 'playing' && (
@@ -799,39 +743,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 4,
     elevation: 3,
-  },
-  progressRing: {
-    position: 'absolute',
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    overflow: 'hidden',
-  },
-  progressArc: {
-    position: 'absolute',
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    borderWidth: 2,
-    borderTopColor: 'transparent',
-    borderRightColor: 'transparent',
-    borderBottomColor: 'transparent',
-  },
-  holdInstruction: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    alignItems: 'center',
-  },
-  holdInstructionText: {
-    backgroundColor: CLOUD9_COLORS.primaryTranslucent,
-    color: CLOUD9_COLORS.primary,
-    fontSize: 12,
-    fontWeight: '600',
-    paddingVertical: 6,
-    paddingHorizontal: 16,
-    borderRadius: 20,
-    overflow: 'hidden',
   },
   joystickContainer: {
     position: 'absolute',
