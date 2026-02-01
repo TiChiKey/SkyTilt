@@ -49,11 +49,12 @@ interface MarbleStatusProps {
 function MarbleStatus({ colorId, isInGoal, holdProgress, isAlive }: MarbleStatusProps) {
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const glowOpacity = useRef(new Animated.Value(0)).current;
+  const pulseAnimationRef = useRef<Animated.CompositeAnimation | null>(null);
 
   useEffect(() => {
     if (isInGoal) {
       // Start pulsing glow when in goal
-      Animated.loop(
+      pulseAnimationRef.current = Animated.loop(
         Animated.sequence([
           Animated.timing(pulseAnim, {
             toValue: 1.2,
@@ -66,7 +67,8 @@ function MarbleStatus({ colorId, isInGoal, holdProgress, isAlive }: MarbleStatus
             useNativeDriver: true,
           }),
         ])
-      ).start();
+      );
+      pulseAnimationRef.current.start();
 
       Animated.timing(glowOpacity, {
         toValue: 1,
@@ -74,14 +76,32 @@ function MarbleStatus({ colorId, isInGoal, holdProgress, isAlive }: MarbleStatus
         useNativeDriver: true,
       }).start();
     } else {
-      pulseAnim.stopAnimation();
-      pulseAnim.setValue(1);
+      // Stop the loop animation properly and reset with animation (not direct setValue)
+      if (pulseAnimationRef.current) {
+        pulseAnimationRef.current.stop();
+        pulseAnimationRef.current = null;
+      }
+      // Use animation to reset instead of direct setValue to avoid native driver conflict
+      Animated.timing(pulseAnim, {
+        toValue: 1,
+        duration: 100,
+        useNativeDriver: true,
+      }).start();
+
       Animated.timing(glowOpacity, {
         toValue: 0,
         duration: 200,
         useNativeDriver: true,
       }).start();
     }
+
+    // Cleanup on unmount
+    return () => {
+      if (pulseAnimationRef.current) {
+        pulseAnimationRef.current.stop();
+        pulseAnimationRef.current = null;
+      }
+    };
   }, [isInGoal]);
 
   const color = MARBLE_COLORS[colorId];
